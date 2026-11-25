@@ -66,3 +66,32 @@ CREATE INDEX IF NOT EXISTS idx_products_barcode ON products(barcode);
 CREATE INDEX IF NOT EXISTS idx_products_category ON products(category);
 CREATE INDEX IF NOT EXISTS idx_transactions_invoice ON transactions(invoice_number);
 CREATE INDEX IF NOT EXISTS idx_transactions_created_at ON transactions(created_at);
+
+-- ============================================================
+-- HAK AKSES (PERMISSIONS) & ROW LEVEL SECURITY (RLS)
+-- PENTING: Wajib dijalankan agar API Key anon/publishable dapat membaca dan menyimpan data!
+-- ============================================================
+
+-- Berikan izin akses skema public ke role anon dan authenticated
+GRANT USAGE ON SCHEMA public TO anon, authenticated;
+GRANT ALL ON ALL TABLES IN SCHEMA public TO anon, authenticated;
+GRANT ALL ON ALL SEQUENCES IN SCHEMA public TO anon, authenticated;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO anon, authenticated;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO anon, authenticated;
+
+-- Aktifkan Row Level Security (RLS) dengan Policy Akses Penuh untuk Kasir
+ALTER TABLE products ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Allow all for products" ON products;
+CREATE POLICY "Allow all for products" ON products FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
+
+ALTER TABLE transactions ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Allow all for transactions" ON transactions;
+CREATE POLICY "Allow all for transactions" ON transactions FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
+
+ALTER TABLE transaction_items ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Allow all for transaction_items" ON transaction_items;
+CREATE POLICY "Allow all for transaction_items" ON transaction_items FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
+
+ALTER TABLE store_settings ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Allow all for store_settings" ON store_settings;
+CREATE POLICY "Allow all for store_settings" ON store_settings FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);

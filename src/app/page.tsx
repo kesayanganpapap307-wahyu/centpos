@@ -11,6 +11,7 @@ import { VercelDeployGuide } from '../components/VercelDeployGuide';
 import { ReceiptPrint } from '../components/ReceiptPrint';
 import { Product, Transaction, StoreSettings } from '../types/pos';
 import { initialProducts, initialStoreSettings } from '../data/initialData';
+import { AlertTriangle, CheckCircle2, Copy, Check, Database } from 'lucide-react';
 
 export default function Home() {
   const [activeTab, setActiveTab] = useState<'portal' | 'pos' | 'products' | 'reports' | 'settings' | 'deploy'>('portal');
@@ -21,16 +22,44 @@ export default function Home() {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [settings, setSettings] = useState<StoreSettings>(initialStoreSettings);
 
+  // Cloud Sync State
+  const [cloudStatus, setCloudStatus] = useState<'connecting' | 'connected' | 'error' | 'offline'>('connecting');
+  const [cloudError, setCloudError] = useState<string | null>(null);
+  const [copiedSql, setCopiedSql] = useState(false);
+
   // Active Receipt Modal
   const [activeReceipt, setActiveReceipt] = useState<Transaction | null>(null);
 
-  // Load from localStorage on mount
+  const grantSqlCode = `-- Jalankan query ini di SQL Editor Supabase Anda:
+GRANT USAGE ON SCHEMA public TO anon, authenticated;
+GRANT ALL ON ALL TABLES IN SCHEMA public TO anon, authenticated;
+GRANT ALL ON ALL SEQUENCES IN SCHEMA public TO anon, authenticated;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO anon, authenticated;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO anon, authenticated;
+
+ALTER TABLE products ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Allow all for products" ON products;
+CREATE POLICY "Allow all for products" ON products FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
+
+ALTER TABLE transactions ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Allow all for transactions" ON transactions;
+CREATE POLICY "Allow all for transactions" ON transactions FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
+
+ALTER TABLE transaction_items ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Allow all for transaction_items" ON transaction_items;
+CREATE POLICY "Allow all for transaction_items" ON transaction_items FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);`;
+
+  // 1. Initial Load & Cloud Sync
   useEffect(() => {
     setIsClient(true);
+    let currentProducts = initialProducts;
+
+    // Load LocalStorage first for instant speed
     try {
       const savedProducts = localStorage.getItem('centpos_products');
       if (savedProducts) {
-        setProducts(JSON.parse(savedProducts));
+        currentProducts = JSON.parse(savedProducts);
+        setProducts(currentProducts);
       } else {
         setProducts(initialProducts);
         localStorage.setItem('centpos_products', JSON.stringify(initialProducts));
@@ -40,7 +69,6 @@ export default function Home() {
       if (savedTransactions) {
         setTransactions(JSON.parse(savedTransactions));
       } else {
-        // Initial sample transaction for demonstration
         const sampleTransaction: Transaction = {
           id: 'trx-sample-1',
           invoiceNumber: 'INV-261125-1001',
@@ -84,10 +112,57 @@ export default function Home() {
       setProducts(initialProducts);
       setSettings(initialStoreSettings);
     }
+
+    // 2. Asynchronously sync with Supabase Cloud
+    const syncCloud = async () => {
+      try {
+        const statusRes = await fetch('/api/status');
+        const statusData = await statusRes.json();
+
+        if (!statusData.configured) {
+          setCloudStatus('offline');
+          return;
+        }
+
+        if (!statusData.dbConnected) {
+          setCloudStatus('error');
+          setCloudError(statusData.error || 'Permission denied on database');
+          return;
+        }
+
+        setCloudStatus('connected');
+        setCloudError(null);
+
+        // Fetch products from Supabase
+        const prodRes = await fetch('/api/products');
+        if (prodRes.ok) {
+          const dbProducts = await prodRes.json();
+          if (Array.isArray(dbProducts) && dbProducts.length > 0) {
+            setProducts(dbProducts);
+            localStorage.setItem('centpos_products', JSON.stringify(dbProducts));
+          }
+        }
+
+        // Fetch transactions from Supabase
+        const trxRes = await fetch('/api/transactions');
+        if (trxRes.ok) {
+          const dbTransactions = await trxRes.json();
+          if (Array.isArray(dbTransactions) && dbTransactions.length > 0) {
+            setTransactions(dbTransactions);
+            localStorage.setItem('centpos_transactions', JSON.stringify(dbTransactions));
+          }
+        }
+      } catch (err: any) {
+        console.warn('Cloud sync error, falling back to local storage:', err);
+        setCloudStatus('offline');
+      }
+    };
+
+    syncCloud();
   }, []);
 
-  // Save to localStorage when states change
-  const saveProducts = (newProducts: Product[]) => {
+  // Save to localStorage
+  const saveProductsLocally = (newProducts: Product[]) => {
     setProducts(newProducts);
     try {
       localStorage.setItem('centpos_products', JSON.stringify(newProducts));
@@ -96,7 +171,7 @@ export default function Home() {
     }
   };
 
-  const saveTransactions = (newTransactions: Transaction[]) => {
+  const saveTransactionsLocally = (newTransactions: Transaction[]) => {
     setTransactions(newTransactions);
     try {
       localStorage.setItem('centpos_transactions', JSON.stringify(newTransactions));
@@ -105,7 +180,7 @@ export default function Home() {
     }
   };
 
-  const saveSettings = (newSettings: StoreSettings) => {
+  const saveSettingsLocally = (newSettings: StoreSettings) => {
     setSettings(newSettings);
     try {
       localStorage.setItem('centpos_settings', JSON.stringify(newSettings));
@@ -114,13 +189,16 @@ export default function Home() {
     }
   };
 
-  // Stock deduction upon cashier checkout
-  const handleUpdateProductStock = (productId: string, quantityDeducted: number) => {
+  // Stock deduction
+  const handleUpdateProductStock = async (productId: string, quantityDeducted: number) => {
+    let targetProduct: Product | undefined;
+
     setProducts((prev) => {
       const updated = prev.map((p) => {
         if (p.id === productId) {
           const newStock = Math.max(0, p.stock - quantityDeducted);
-          return { ...p, stock: newStock };
+          targetProduct = { ...p, stock: newStock };
+          return targetProduct;
         }
         return p;
       });
@@ -131,14 +209,30 @@ export default function Home() {
       }
       return updated;
     });
+
+    // Sync updated stock to Supabase
+    if (targetProduct) {
+      try {
+        await fetch('/api/products', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(targetProduct),
+        });
+      } catch (e) {
+        console.warn('Could not sync stock deduction to cloud:', e);
+      }
+    }
   };
 
-  // Quick add stock (e.g. from portal alert)
-  const handleQuickAddStock = (productId: string, amount: number) => {
+  // Quick add stock
+  const handleQuickAddStock = async (productId: string, amount: number) => {
+    let targetProduct: Product | undefined;
+
     setProducts((prev) => {
       const updated = prev.map((p) => {
         if (p.id === productId) {
-          return { ...p, stock: p.stock + amount };
+          targetProduct = { ...p, stock: p.stock + amount };
+          return targetProduct;
         }
         return p;
       });
@@ -149,36 +243,118 @@ export default function Home() {
       }
       return updated;
     });
+
+    if (targetProduct) {
+      try {
+        await fetch('/api/products', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(targetProduct),
+        });
+      } catch (e) {
+        console.warn('Could not sync quick stock to cloud:', e);
+      }
+    }
   };
 
-  // Save new transaction
-  const handleSaveTransaction = (transaction: Transaction) => {
+  // Save transaction
+  const handleSaveTransaction = async (transaction: Transaction) => {
     const updated = [transaction, ...transactions];
-    saveTransactions(updated);
+    saveTransactionsLocally(updated);
+
+    // Sync to Supabase
+    try {
+      await fetch('/api/transactions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(transaction),
+      });
+    } catch (e) {
+      console.warn('Could not sync transaction to cloud:', e);
+    }
   };
 
-  // Products CRUD
-  const handleAddProduct = (product: Product) => {
+  // Add Product (with Cloud Sync)
+  const handleAddProduct = async (product: Product) => {
+    // 1. Optimistic local update
     const updated = [product, ...products];
-    saveProducts(updated);
+    saveProductsLocally(updated);
+
+    // 2. Sync to Supabase via server API
+    try {
+      const res = await fetch('/api/products', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(product),
+      });
+
+      if (res.ok) {
+        const savedData = await res.json();
+        // Replace temporary local ID with Supabase UUID
+        if (savedData?.id) {
+          setProducts((prev) => {
+            const synced = prev.map((p) =>
+              p.id === product.id ? { ...p, id: savedData.id } : p
+            );
+            localStorage.setItem('centpos_products', JSON.stringify(synced));
+            return synced;
+          });
+        }
+      } else {
+        const errorData = await res.json();
+        console.error('Supabase error saving product:', errorData);
+        if (errorData?.error && errorData.error.includes('permission denied')) {
+          setCloudStatus('error');
+          setCloudError(errorData.error);
+        }
+      }
+    } catch (e) {
+      console.warn('Could not sync product to cloud:', e);
+    }
   };
 
-  const handleUpdateProduct = (product: Product) => {
+  // Update Product (with Cloud Sync)
+  const handleUpdateProduct = async (product: Product) => {
     const updated = products.map((p) => (p.id === product.id ? product : p));
-    saveProducts(updated);
+    saveProductsLocally(updated);
+
+    try {
+      await fetch('/api/products', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(product),
+      });
+    } catch (e) {
+      console.warn('Could not sync updated product to cloud:', e);
+    }
   };
 
-  const handleDeleteProduct = (id: string) => {
+  // Delete Product (with Cloud Sync)
+  const handleDeleteProduct = async (id: string) => {
     const updated = products.filter((p) => p.id !== id);
-    saveProducts(updated);
+    saveProductsLocally(updated);
+
+    try {
+      await fetch(`/api/products?id=${encodeURIComponent(id)}`, {
+        method: 'DELETE',
+      });
+    } catch (e) {
+      console.warn('Could not sync deleted product to cloud:', e);
+    }
   };
 
-  // Reset to initial demo data
+  // Reset data
   const handleResetData = () => {
-    saveProducts(initialProducts);
-    saveTransactions([]);
-    saveSettings(initialStoreSettings);
+    saveProductsLocally(initialProducts);
+    saveTransactionsLocally([]);
+    saveSettingsLocally(initialStoreSettings);
     alert('Data toko dan transaksi berhasil di-reset ke pengaturan awal.');
+  };
+
+  const copyGrantSql = () => {
+    navigator.clipboard.writeText(grantSqlCode);
+    setCopiedSql(true);
+    setTimeout(() => setCopiedSql(false), 2500);
   };
 
   if (!isClient) {
@@ -203,6 +379,38 @@ export default function Home() {
         cartCount={0}
         settings={settings}
       />
+
+      {/* Cloud Status Alert Banner (if Supabase permissions are missing) */}
+      {cloudStatus === 'error' && (
+        <div className="bg-amber-500 text-slate-950 px-4 py-3 border-b border-amber-600 shadow-sm">
+          <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs">
+            <div className="flex items-center gap-2">
+              <AlertTriangle className="w-4 h-4 shrink-0 text-slate-950" />
+              <div>
+                <span className="font-bold">Izin Database Supabase Diperlukan (Permission Denied):</span>{' '}
+                <span>Supabase menolak akses tulis karena tabel belum diberi hak akses GRANT.</span>
+              </div>
+            </div>
+
+            <button
+              onClick={copyGrantSql}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-900 text-white rounded-lg font-bold hover:bg-slate-800 transition-colors shrink-0"
+            >
+              {copiedSql ? (
+                <>
+                  <Check className="w-3.5 h-3.5 text-emerald-400" />
+                  <span>SQL Izin Tersalin!</span>
+                </>
+              ) : (
+                <>
+                  <Copy className="w-3.5 h-3.5" />
+                  <span>Salin SQL Perbaikan Izin</span>
+                </>
+              )}
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Main Views */}
       <main className="flex-1 flex flex-col">
@@ -247,7 +455,7 @@ export default function Home() {
         {activeTab === 'settings' && (
           <SettingsView
             settings={settings}
-            onSaveSettings={saveSettings}
+            onSaveSettings={saveSettingsLocally}
             onResetData={handleResetData}
           />
         )}
