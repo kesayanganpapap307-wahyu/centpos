@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Navbar } from '../components/Navbar';
+import { PortalView } from '../components/PortalView';
 import { CashierView } from '../components/CashierView';
 import { ProductsView } from '../components/ProductsView';
 import { ReportsView } from '../components/ReportsView';
@@ -12,7 +13,7 @@ import { Product, Transaction, StoreSettings } from '../types/pos';
 import { initialProducts, initialStoreSettings } from '../data/initialData';
 
 export default function Home() {
-  const [activeTab, setActiveTab] = useState<'pos' | 'products' | 'reports' | 'settings' | 'deploy'>('pos');
+  const [activeTab, setActiveTab] = useState<'portal' | 'pos' | 'products' | 'reports' | 'settings' | 'deploy'>('portal');
   const [isClient, setIsClient] = useState(false);
 
   // Core Data States
@@ -132,6 +133,24 @@ export default function Home() {
     });
   };
 
+  // Quick add stock (e.g. from portal alert)
+  const handleQuickAddStock = (productId: string, amount: number) => {
+    setProducts((prev) => {
+      const updated = prev.map((p) => {
+        if (p.id === productId) {
+          return { ...p, stock: p.stock + amount };
+        }
+        return p;
+      });
+      try {
+        localStorage.setItem('centpos_products', JSON.stringify(updated));
+      } catch (e) {
+        console.error(e);
+      }
+      return updated;
+    });
+  };
+
   // Save new transaction
   const handleSaveTransaction = (transaction: Transaction) => {
     const updated = [transaction, ...transactions];
@@ -187,6 +206,17 @@ export default function Home() {
 
       {/* Main Views */}
       <main className="flex-1 flex flex-col">
+        {activeTab === 'portal' && (
+          <PortalView
+            onNavigate={(tab) => setActiveTab(tab)}
+            products={products}
+            transactions={transactions}
+            settings={settings}
+            onOpenReceipt={(trx) => setActiveReceipt(trx)}
+            onQuickAddStock={handleQuickAddStock}
+          />
+        )}
+
         {activeTab === 'pos' && (
           <CashierView
             products={products}
