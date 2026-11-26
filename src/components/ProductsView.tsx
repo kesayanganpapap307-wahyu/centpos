@@ -10,7 +10,9 @@ import {
   CheckCircle2, 
   Package, 
   Tag,
-  Barcode
+  Barcode,
+  LayoutGrid,
+  List
 } from 'lucide-react';
 import { Product, Category } from '../types/pos';
 import { formatCurrency } from '../utils/format';
@@ -30,6 +32,7 @@ export const ProductsView: React.FC<ProductsViewProps> = ({
 }) => {
   const [search, setSearch] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<Category>('Semua');
+  const [viewMode, setViewMode] = useState<'grid' | 'table'>('grid');
 
   // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -157,215 +160,252 @@ export const ProductsView: React.FC<ProductsViewProps> = ({
           />
         </div>
 
-        <div className="flex gap-1.5 overflow-x-auto pb-1">
-          {categories.map((cat) => (
+        <div className="flex items-center justify-between gap-2 overflow-x-auto pb-1">
+          <div className="flex gap-1.5">
+            {categories.map((cat) => (
+              <button
+                key={cat}
+                onClick={() => setSelectedCategory(cat)}
+                className={`px-3.5 py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition-colors ${
+                  selectedCategory === cat
+                    ? 'bg-emerald-600 text-white shadow-xs'
+                    : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
+                }`}
+              >
+                {cat}
+              </button>
+            ))}
+          </div>
+
+          {/* Toggle View Mode (Kartu vs Tabel) */}
+          <div className="flex items-center gap-1 bg-white p-1 rounded-xl border border-slate-200 shadow-xs shrink-0">
             <button
-              key={cat}
-              onClick={() => setSelectedCategory(cat)}
-              className={`px-3.5 py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition-colors ${
-                selectedCategory === cat
-                  ? 'bg-emerald-600 text-white'
-                  : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
+              onClick={() => setViewMode('grid')}
+              className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                viewMode === 'grid'
+                  ? 'bg-emerald-600 text-white shadow-xs'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
               }`}
+              title="Tampilan Kartu Modern"
             >
-              {cat}
+              <LayoutGrid className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Kartu</span>
             </button>
-          ))}
+            <button
+              onClick={() => setViewMode('table')}
+              className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                viewMode === 'table'
+                  ? 'bg-emerald-600 text-white shadow-xs'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+              }`}
+              title="Tampilan Tabel Spreadsheet"
+            >
+              <List className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Tabel</span>
+            </button>
+          </div>
         </div>
       </div>
 
-      {/* Products Table (Desktop) */}
-      <div className="hidden md:block bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs">
-            <thead className="bg-slate-50 text-slate-600 border-b border-slate-200 font-semibold uppercase tracking-wider text-[11px]">
-              <tr>
-                <th className="px-5 py-3.5">Nama Produk</th>
-                <th className="px-4 py-3.5">Kategori</th>
-                <th className="px-4 py-3.5">Barcode/SKU</th>
-                <th className="px-4 py-3.5 text-right">Harga Modal</th>
-                <th className="px-4 py-3.5 text-right">Harga Jual</th>
-                <th className="px-4 py-3.5 text-center">Stok</th>
-                <th className="px-5 py-3.5 text-right">Aksi</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {filtered.length === 0 ? (
-                <tr>
-                  <td colSpan={7} className="px-6 py-12 text-center text-slate-400">
-                    Tidak ada produk yang sesuai kriteria pencarian.
-                  </td>
-                </tr>
-              ) : (
-                filtered.map((item) => {
-                  const isLow = item.stock > 0 && item.stock <= 10;
-                  const isOut = item.stock <= 0;
+      {/* 1. VIEW MODE: KARTU MODERN (Card Grid) */}
+      {viewMode === 'grid' && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+          {filtered.length === 0 ? (
+            <div className="col-span-full bg-white rounded-2xl border border-slate-200 p-12 text-center text-slate-400 text-sm shadow-xs">
+              Tidak ada produk yang sesuai kriteria pencarian.
+            </div>
+          ) : (
+            filtered.map((item) => {
+              const isLow = item.stock > 0 && item.stock <= 10;
+              const isOut = item.stock <= 0;
 
-                  return (
-                    <tr key={item.id} className="hover:bg-slate-50/80 transition-colors">
-                      <td className="px-5 py-3.5">
-                        <div className="flex items-center gap-2.5">
-                          <div
-                            className={`w-3 h-3 rounded-full shrink-0 ${
-                              item.color || 'bg-emerald-500'
-                            }`}
-                          />
-                          <span className="font-semibold text-slate-900 text-sm">
+              return (
+                <div
+                  key={item.id}
+                  className="bg-white rounded-2xl border border-slate-200 p-4.5 shadow-xs hover:shadow-md transition-all flex flex-col justify-between space-y-3.5"
+                >
+                  <div className="space-y-2">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <div
+                          className={`w-3.5 h-3.5 rounded-full shrink-0 ${
+                            item.color || 'bg-emerald-500'
+                          }`}
+                        />
+                        <div className="min-w-0">
+                          <h4 className="font-bold text-slate-900 text-base leading-tight truncate">
                             {item.name}
+                          </h4>
+                          <span className="inline-block mt-1 bg-slate-100 text-slate-700 px-2 py-0.5 rounded text-[11px] font-medium">
+                            {item.category}
                           </span>
                         </div>
-                      </td>
-                      <td className="px-4 py-3.5">
-                        <span className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 font-medium text-[11px]">
-                          {item.category}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3.5 font-mono text-slate-500 flex items-center gap-1">
-                        <Barcode className="w-3.5 h-3.5 text-slate-400" />
-                        <span>{item.barcode}</span>
-                      </td>
-                      <td className="px-4 py-3.5 text-right text-slate-500">
-                        {formatCurrency(item.buyPrice)}
-                      </td>
-                      <td className="px-4 py-3.5 text-right font-bold text-slate-900">
-                        {formatCurrency(item.sellPrice)}
-                      </td>
-                      <td className="px-4 py-3.5 text-center">
-                        <span
-                          className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold ${
-                            isOut
-                              ? 'bg-rose-100 text-rose-700'
-                              : isLow
-                              ? 'bg-amber-100 text-amber-800'
-                              : 'bg-emerald-100 text-emerald-800'
-                          }`}
-                        >
-                          {isOut && <AlertTriangle className="w-3 h-3" />}
-                          {item.stock} {item.unit}
-                        </span>
-                      </td>
-                      <td className="px-5 py-3.5 text-right">
-                        <div className="flex items-center justify-end gap-1.5">
-                          <button
-                            onClick={() => handleOpenEdit(item)}
-                            className="p-1.5 rounded-lg text-slate-500 hover:text-emerald-600 hover:bg-emerald-50 transition-colors"
-                            title="Edit Produk"
-                          >
-                            <Edit3 className="w-4 h-4" />
-                          </button>
-                          <button
-                            onClick={() => {
-                              if (confirm(`Yakin hapus produk "${item.name}"?`)) {
-                                onDeleteProduct(item.id);
-                              }
-                            }}
-                            className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors"
-                            title="Hapus Produk"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
+                      </div>
 
-      {/* Products Card List (Khusus Tampilan Layar HP / Mobile) */}
-      <div className="md:hidden space-y-3">
-        {filtered.length === 0 ? (
-          <div className="bg-white rounded-2xl border border-slate-200 p-8 text-center text-slate-400 text-sm">
-            Tidak ada produk yang sesuai kriteria pencarian.
-          </div>
-        ) : (
-          filtered.map((item) => {
-            const isLow = item.stock > 0 && item.stock <= 10;
-            const isOut = item.stock <= 0;
+                      <span
+                        className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold shrink-0 ${
+                          isOut
+                            ? 'bg-rose-100 text-rose-700'
+                            : isLow
+                            ? 'bg-amber-100 text-amber-800'
+                            : 'bg-emerald-100 text-emerald-800'
+                        }`}
+                      >
+                        {isOut && <AlertTriangle className="w-3 h-3" />}
+                        {item.stock} {item.unit}
+                      </span>
+                    </div>
 
-            return (
-              <div
-                key={item.id}
-                className="bg-white rounded-2xl border border-slate-200 p-4 shadow-xs space-y-3"
-              >
-                {/* Header Kartu: Nama & Kategori & Stok */}
-                <div className="flex items-start justify-between gap-2">
-                  <div className="flex items-center gap-2 min-w-0">
-                    <div
-                      className={`w-3.5 h-3.5 rounded-full shrink-0 ${
-                        item.color || 'bg-emerald-500'
-                      }`}
-                    />
-                    <div className="min-w-0">
-                      <h4 className="font-bold text-slate-900 text-base leading-tight truncate">
-                        {item.name}
-                      </h4>
-                      <p className="text-xs text-slate-500 mt-0.5">
-                        <span className="bg-slate-100 text-slate-700 px-1.5 py-0.5 rounded font-medium mr-1.5">
-                          {item.category}
-                        </span>
-                        <span className="font-mono">{item.barcode}</span>
-                      </p>
+                    <div className="font-mono text-xs text-slate-400 flex items-center gap-1.5 pt-1">
+                      <Barcode className="w-3.5 h-3.5 text-slate-400" />
+                      <span>{item.barcode}</span>
                     </div>
                   </div>
 
-                  <span
-                    className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold shrink-0 ${
-                      isOut
-                        ? 'bg-rose-100 text-rose-700'
-                        : isLow
-                        ? 'bg-amber-100 text-amber-800'
-                        : 'bg-emerald-100 text-emerald-800'
-                    }`}
-                  >
-                    {isOut && <AlertTriangle className="w-3 h-3" />}
-                    {item.stock} {item.unit}
-                  </span>
-                </div>
-
-                {/* Harga & Tombol Aksi */}
-                <div className="flex items-center justify-between pt-2 border-t border-slate-100">
-                  <div>
-                    <span className="text-[11px] text-slate-400 block">Harga Jual</span>
-                    <span className="text-base font-bold text-slate-900">
-                      {formatCurrency(item.sellPrice)}
-                    </span>
-                    {item.buyPrice > 0 && (
-                      <span className="text-[11px] text-slate-400 block">
-                        Modal: {formatCurrency(item.buyPrice)}
+                  <div className="flex items-end justify-between pt-3 border-t border-slate-100">
+                    <div>
+                      <span className="text-[11px] text-slate-400 block font-medium">Harga Jual</span>
+                      <span className="text-base font-bold text-slate-900">
+                        {formatCurrency(item.sellPrice)}
                       </span>
-                    )}
-                  </div>
+                      {item.buyPrice > 0 && (
+                        <span className="text-[11px] text-slate-400 block">
+                          Modal: {formatCurrency(item.buyPrice)}
+                        </span>
+                      )}
+                    </div>
 
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => handleOpenEdit(item)}
-                      className="flex items-center gap-1 px-3 py-2 bg-slate-100 hover:bg-emerald-50 hover:text-emerald-700 text-slate-700 font-semibold text-xs rounded-xl transition-colors active:scale-95"
-                    >
-                      <Edit3 className="w-3.5 h-3.5" />
-                      <span>Edit</span>
-                    </button>
-                    <button
-                      onClick={() => {
-                        if (confirm(`Yakin hapus produk "${item.name}"?`)) {
-                          onDeleteProduct(item.id);
-                        }
-                      }}
-                      className="p-2 bg-rose-50 hover:bg-rose-100 text-rose-600 rounded-xl transition-colors active:scale-95"
-                      title="Hapus Produk"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        onClick={() => handleOpenEdit(item)}
+                        className="flex items-center gap-1 px-3 py-1.5 bg-slate-100 hover:bg-emerald-50 hover:text-emerald-700 text-slate-700 font-semibold text-xs rounded-xl transition-colors active:scale-95"
+                        title="Edit Produk"
+                      >
+                        <Edit3 className="w-3.5 h-3.5" />
+                        <span>Edit</span>
+                      </button>
+                      <button
+                        onClick={() => {
+                          if (confirm(`Yakin hapus produk "${item.name}"?`)) {
+                            onDeleteProduct(item.id);
+                          }
+                        }}
+                        className="p-1.5 bg-rose-50 hover:bg-rose-100 text-rose-600 rounded-xl transition-colors active:scale-95"
+                        title="Hapus Produk"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
                   </div>
                 </div>
-              </div>
-            );
-          })
-        )}
-      </div>
+              );
+            })
+          )}
+        </div>
+      )}
+
+      {/* 2. VIEW MODE: TABEL SPREADSHEET */}
+      {viewMode === 'table' && (
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs">
+              <thead className="bg-slate-50 text-slate-600 border-b border-slate-200 font-semibold uppercase tracking-wider text-[11px]">
+                <tr>
+                  <th className="px-5 py-3.5">Nama Produk</th>
+                  <th className="px-4 py-3.5">Kategori</th>
+                  <th className="px-4 py-3.5">Barcode/SKU</th>
+                  <th className="px-4 py-3.5 text-right">Harga Modal</th>
+                  <th className="px-4 py-3.5 text-right">Harga Jual</th>
+                  <th className="px-4 py-3.5 text-center">Stok</th>
+                  <th className="px-5 py-3.5 text-right">Aksi</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {filtered.length === 0 ? (
+                  <tr>
+                    <td colSpan={7} className="px-6 py-12 text-center text-slate-400">
+                      Tidak ada produk yang sesuai kriteria pencarian.
+                    </td>
+                  </tr>
+                ) : (
+                  filtered.map((item) => {
+                    const isLow = item.stock > 0 && item.stock <= 10;
+                    const isOut = item.stock <= 0;
+
+                    return (
+                      <tr key={item.id} className="hover:bg-slate-50/80 transition-colors">
+                        <td className="px-5 py-3.5">
+                          <div className="flex items-center gap-2.5">
+                            <div
+                              className={`w-3 h-3 rounded-full shrink-0 ${
+                                item.color || 'bg-emerald-500'
+                              }`}
+                            />
+                            <span className="font-semibold text-slate-900 text-sm">
+                              {item.name}
+                            </span>
+                          </div>
+                        </td>
+                        <td className="px-4 py-3.5">
+                          <span className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 font-medium text-[11px]">
+                            {item.category}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3.5 font-mono text-slate-500 flex items-center gap-1">
+                          <Barcode className="w-3.5 h-3.5 text-slate-400" />
+                          <span>{item.barcode}</span>
+                        </td>
+                        <td className="px-4 py-3.5 text-right text-slate-500">
+                          {formatCurrency(item.buyPrice)}
+                        </td>
+                        <td className="px-4 py-3.5 text-right font-bold text-slate-900">
+                          {formatCurrency(item.sellPrice)}
+                        </td>
+                        <td className="px-4 py-3.5 text-center">
+                          <span
+                            className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold ${
+                              isOut
+                                ? 'bg-rose-100 text-rose-700'
+                                : isLow
+                                ? 'bg-amber-100 text-amber-800'
+                                : 'bg-emerald-100 text-emerald-800'
+                            }`}
+                          >
+                            {isOut && <AlertTriangle className="w-3 h-3" />}
+                            {item.stock} {item.unit}
+                          </span>
+                        </td>
+                        <td className="px-5 py-3.5 text-right">
+                          <div className="flex items-center justify-end gap-1.5">
+                            <button
+                              onClick={() => handleOpenEdit(item)}
+                              className="p-1.5 rounded-lg text-slate-500 hover:text-emerald-600 hover:bg-emerald-50 transition-colors"
+                              title="Edit Produk"
+                            >
+                              <Edit3 className="w-4 h-4" />
+                            </button>
+                            <button
+                              onClick={() => {
+                                if (confirm(`Yakin hapus produk "${item.name}"?`)) {
+                                  onDeleteProduct(item.id);
+                                }
+                              }}
+                              className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors"
+                              title="Hapus Produk"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
 
       {/* Add / Edit Product Modal */}
       {isModalOpen && (
