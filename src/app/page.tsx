@@ -8,13 +8,15 @@ import { ReportsView } from '../components/ReportsView';
 import { SettingsView } from '../components/SettingsView';
 import { VercelDeployGuide } from '../components/VercelDeployGuide';
 import { ReceiptPrint } from '../components/ReceiptPrint';
-import { Product, Transaction, StoreSettings } from '../types/pos';
+import { LoginView } from '../components/LoginView';
+import { Product, Transaction, StoreSettings, AuthUser } from '../types/pos';
 import { initialProducts, initialStoreSettings } from '../data/initialData';
 import { AlertTriangle, Copy, Check } from 'lucide-react';
 
 export default function Home() {
   const [activeTab, setActiveTab] = useState<'pos' | 'products' | 'reports' | 'settings' | 'deploy'>('pos');
   const [isClient, setIsClient] = useState(false);
+  const [currentUser, setCurrentUser] = useState<AuthUser | null>(null);
 
   // Core Data States
   const [products, setProducts] = useState<Product[]>([]);
@@ -105,6 +107,13 @@ CREATE POLICY "Allow all for transaction_items" ON transaction_items FOR ALL TO 
       const savedSettings = localStorage.getItem('centpos_settings');
       if (savedSettings) {
         setSettings(JSON.parse(savedSettings));
+      }
+
+      const savedUser = localStorage.getItem('centpos_user');
+      if (savedUser) {
+        const parsedUser: AuthUser = JSON.parse(savedUser);
+        setCurrentUser(parsedUser);
+        setSettings((prev) => ({ ...prev, cashierName: parsedUser.name }));
       }
     } catch (e) {
       console.error('Error loading data from localStorage', e);
@@ -256,9 +265,25 @@ CREATE POLICY "Allow all for transaction_items" ON transaction_items FOR ALL TO 
     }
   };
 
+  // Login & Logout Handlers
+  const handleLogin = (user: AuthUser) => {
+    setCurrentUser(user);
+    localStorage.setItem('centpos_user', JSON.stringify(user));
+    setSettings((prev) => ({ ...prev, cashierName: user.name }));
+  };
+
+  const handleLogout = () => {
+    setCurrentUser(null);
+    localStorage.removeItem('centpos_user');
+  };
+
   // Save transaction
   const handleSaveTransaction = async (transaction: Transaction) => {
-    const updated = [transaction, ...transactions];
+    const trxWithCashier = {
+      ...transaction,
+      cashierName: currentUser?.name || settings.cashierName,
+    };
+    const updated = [trxWithCashier, ...transactions];
     saveTransactionsLocally(updated);
 
     // Sync to Supabase
@@ -266,7 +291,7 @@ CREATE POLICY "Allow all for transaction_items" ON transaction_items FOR ALL TO 
       await fetch('/api/transactions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(transaction),
+        body: JSON.stringify(trxWithCashier),
       });
     } catch (e) {
       console.warn('Could not sync transaction to cloud:', e);
@@ -369,6 +394,11 @@ CREATE POLICY "Allow all for transaction_items" ON transaction_items FOR ALL TO 
     );
   }
 
+  // Jika belum login, tampilkan layar Login
+  if (!currentUser) {
+    return <LoginView settings={settings} onLogin={handleLogin} />;
+  }
+
   return (
     <div className="min-h-screen flex flex-col md:flex-row bg-slate-100">
       {/* Left Sidebar (Desktop Fixed + Mobile Slide-out Drawer) */}
@@ -378,6 +408,8 @@ CREATE POLICY "Allow all for transaction_items" ON transaction_items FOR ALL TO 
         cartCount={0}
         settings={settings}
         cloudStatus={cloudStatus}
+        currentUser={currentUser}
+        onLogout={handleLogout}
       />
 
       {/* Main Content Area */}

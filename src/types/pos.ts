@@ -55,3 +55,11 @@ export interface StoreSettings {
   currency: string;
   paperSize: '58mm' | '80mm';
 }
+
+export interface AuthUser {
+  id: string;
+  name: string;
+  username: string;
+  role: 'owner' | 'cashier';
+  pin?: string;
+}
