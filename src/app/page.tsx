@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Navbar } from '../components/Navbar';
+import { Sidebar } from '../components/Sidebar';
 import { PortalView } from '../components/PortalView';
 import { CashierView } from '../components/CashierView';
 import { ProductsView } from '../components/ProductsView';
@@ -371,97 +371,101 @@ CREATE POLICY "Allow all for transaction_items" ON transaction_items FOR ALL TO 
   }
 
   return (
-    <div className="min-h-screen flex flex-col bg-slate-100">
-      {/* Top Navigation */}
-      <Navbar
+    <div className="min-h-screen flex flex-col md:flex-row bg-slate-100">
+      {/* Left Sidebar (Desktop Fixed + Mobile Slide-out Drawer) */}
+      <Sidebar
         activeTab={activeTab}
         setActiveTab={setActiveTab}
         cartCount={0}
         settings={settings}
+        cloudStatus={cloudStatus}
       />
 
-      {/* Cloud Status Alert Banner (if Supabase permissions are missing) */}
-      {cloudStatus === 'error' && (
-        <div className="bg-amber-500 text-slate-950 px-4 py-3 border-b border-amber-600 shadow-sm">
-          <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs">
-            <div className="flex items-center gap-2">
-              <AlertTriangle className="w-4 h-4 shrink-0 text-slate-950" />
-              <div>
-                <span className="font-bold">Izin Database Supabase Diperlukan (Permission Denied):</span>{' '}
-                <span>Supabase menolak akses tulis karena tabel belum diberi hak akses GRANT.</span>
+      {/* Main Content Area */}
+      <div className="flex-1 flex flex-col min-w-0">
+        {/* Cloud Status Alert Banner (if Supabase permissions are missing) */}
+        {cloudStatus === 'error' && (
+          <div className="bg-amber-500 text-slate-950 px-4 py-3 border-b border-amber-600 shadow-sm">
+            <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs">
+              <div className="flex items-center gap-2">
+                <AlertTriangle className="w-4 h-4 shrink-0 text-slate-950" />
+                <div>
+                  <span className="font-bold">Izin Database Supabase Diperlukan (Permission Denied):</span>{' '}
+                  <span>Supabase menolak akses tulis karena tabel belum diberi hak akses GRANT.</span>
+                </div>
               </div>
+
+              <button
+                onClick={copyGrantSql}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-900 text-white rounded-lg font-bold hover:bg-slate-800 transition-colors shrink-0"
+              >
+                {copiedSql ? (
+                  <>
+                    <Check className="w-3.5 h-3.5 text-emerald-400" />
+                    <span>SQL Izin Tersalin!</span>
+                  </>
+                ) : (
+                  <>
+                    <Copy className="w-3.5 h-3.5" />
+                    <span>Salin SQL Perbaikan Izin</span>
+                  </>
+                )}
+              </button>
             </div>
-
-            <button
-              onClick={copyGrantSql}
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-900 text-white rounded-lg font-bold hover:bg-slate-800 transition-colors shrink-0"
-            >
-              {copiedSql ? (
-                <>
-                  <Check className="w-3.5 h-3.5 text-emerald-400" />
-                  <span>SQL Izin Tersalin!</span>
-                </>
-              ) : (
-                <>
-                  <Copy className="w-3.5 h-3.5" />
-                  <span>Salin SQL Perbaikan Izin</span>
-                </>
-              )}
-            </button>
           </div>
-        </div>
-      )}
-
-      {/* Main Views */}
-      <main className="flex-1 flex flex-col">
-        {activeTab === 'portal' && (
-          <PortalView
-            onNavigate={(tab) => setActiveTab(tab)}
-            products={products}
-            transactions={transactions}
-            settings={settings}
-            onOpenReceipt={(trx) => setActiveReceipt(trx)}
-            onQuickAddStock={handleQuickAddStock}
-          />
         )}
 
-        {activeTab === 'pos' && (
-          <CashierView
-            products={products}
-            onUpdateProductStock={handleUpdateProductStock}
-            onSaveTransaction={handleSaveTransaction}
-            settings={settings}
-            onOpenReceipt={(trx) => setActiveReceipt(trx)}
-          />
-        )}
+        {/* Main Views */}
+        <main className="flex-1 flex flex-col min-w-0">
+          {activeTab === 'portal' && (
+            <PortalView
+              onNavigate={(tab) => setActiveTab(tab)}
+              products={products}
+              transactions={transactions}
+              settings={settings}
+              onOpenReceipt={(trx) => setActiveReceipt(trx)}
+              onQuickAddStock={handleQuickAddStock}
+            />
+          )}
 
-        {activeTab === 'products' && (
-          <ProductsView
-            products={products}
-            onAddProduct={handleAddProduct}
-            onUpdateProduct={handleUpdateProduct}
-            onDeleteProduct={handleDeleteProduct}
-          />
-        )}
+          {activeTab === 'pos' && (
+            <CashierView
+              products={products}
+              onUpdateProductStock={handleUpdateProductStock}
+              onSaveTransaction={handleSaveTransaction}
+              settings={settings}
+              onOpenReceipt={(trx) => setActiveReceipt(trx)}
+            />
+          )}
 
-        {activeTab === 'reports' && (
-          <ReportsView
-            transactions={transactions}
-            onOpenReceipt={(trx) => setActiveReceipt(trx)}
-            settings={settings}
-          />
-        )}
+          {activeTab === 'products' && (
+            <ProductsView
+              products={products}
+              onAddProduct={handleAddProduct}
+              onUpdateProduct={handleUpdateProduct}
+              onDeleteProduct={handleDeleteProduct}
+            />
+          )}
 
-        {activeTab === 'settings' && (
-          <SettingsView
-            settings={settings}
-            onSaveSettings={saveSettingsLocally}
-            onResetData={handleResetData}
-          />
-        )}
+          {activeTab === 'reports' && (
+            <ReportsView
+              transactions={transactions}
+              onOpenReceipt={(trx) => setActiveReceipt(trx)}
+              settings={settings}
+            />
+          )}
 
-        {activeTab === 'deploy' && <VercelDeployGuide />}
-      </main>
+          {activeTab === 'settings' && (
+            <SettingsView
+              settings={settings}
+              onSaveSettings={saveSettingsLocally}
+              onResetData={handleResetData}
+            />
+          )}
+
+          {activeTab === 'deploy' && <VercelDeployGuide />}
+        </main>
+      </div>
 
       {/* Thermal Receipt Print Modal */}
       {activeReceipt && (
