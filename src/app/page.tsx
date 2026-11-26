@@ -2,7 +2,6 @@
 
 import React, { useState, useEffect } from 'react';
 import { Sidebar } from '../components/Sidebar';
-import { PortalView } from '../components/PortalView';
 import { CashierView } from '../components/CashierView';
 import { ProductsView } from '../components/ProductsView';
 import { ReportsView } from '../components/ReportsView';
@@ -14,7 +13,7 @@ import { initialProducts, initialStoreSettings } from '../data/initialData';
 import { AlertTriangle, Copy, Check } from 'lucide-react';
 
 export default function Home() {
-  const [activeTab, setActiveTab] = useState<'portal' | 'pos' | 'products' | 'reports' | 'settings' | 'deploy'>('portal');
+  const [activeTab, setActiveTab] = useState<'pos' | 'products' | 'reports' | 'settings' | 'deploy'>('pos');
   const [isClient, setIsClient] = useState(false);
 
   // Core Data States
@@ -417,17 +416,6 @@ CREATE POLICY "Allow all for transaction_items" ON transaction_items FOR ALL TO 
 
         {/* Main Views */}
         <main className="flex-1 flex flex-col min-w-0">
-          {activeTab === 'portal' && (
-            <PortalView
-              onNavigate={(tab) => setActiveTab(tab)}
-              products={products}
-              transactions={transactions}
-              settings={settings}
-              onOpenReceipt={(trx) => setActiveReceipt(trx)}
-              onQuickAddStock={handleQuickAddStock}
-            />
-          )}
-
           {activeTab === 'pos' && (
             <CashierView
               products={products}

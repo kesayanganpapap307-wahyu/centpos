@@ -18,8 +18,8 @@ import {
 import { StoreSettings } from '../types/pos';
 
 interface SidebarProps {
-  activeTab: 'portal' | 'pos' | 'products' | 'reports' | 'settings' | 'deploy';
-  setActiveTab: (tab: 'portal' | 'pos' | 'products' | 'reports' | 'settings' | 'deploy') => void;
+  activeTab: 'pos' | 'products' | 'reports' | 'settings' | 'deploy';
+  setActiveTab: (tab: 'pos' | 'products' | 'reports' | 'settings' | 'deploy') => void;
   cartCount?: number;
   settings: StoreSettings;
   cloudStatus?: 'connecting' | 'connected' | 'error' | 'offline';
@@ -52,12 +52,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
   }, []);
 
   const navItems = [
-    {
-      id: 'portal' as const,
-      label: 'Portal Ringkasan',
-      shortLabel: 'Portal',
-      icon: LayoutGrid,
-    },
     {
       id: 'pos' as const,
       label: 'Menu Kasir (POS)',
@@ -92,7 +86,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     },
   ];
 
-  const handleSelectTab = (tab: 'portal' | 'pos' | 'products' | 'reports' | 'settings' | 'deploy') => {
+  const handleSelectTab = (tab: 'pos' | 'products' | 'reports' | 'settings' | 'deploy') => {
     setActiveTab(tab);
     setIsOpen(false);
   };
