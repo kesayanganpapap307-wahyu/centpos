@@ -11,7 +11,7 @@ import { VercelDeployGuide } from '../components/VercelDeployGuide';
 import { ReceiptPrint } from '../components/ReceiptPrint';
 import { Product, Transaction, StoreSettings } from '../types/pos';
 import { initialProducts, initialStoreSettings } from '../data/initialData';
-import { AlertTriangle, CheckCircle2, Copy, Check, Database } from 'lucide-react';
+import { AlertTriangle, Copy, Check } from 'lucide-react';
 
 export default function Home() {
   const [activeTab, setActiveTab] = useState<'portal' | 'pos' | 'products' | 'reports' | 'settings' | 'deploy'>('portal');

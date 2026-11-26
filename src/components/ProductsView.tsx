@@ -7,9 +7,7 @@ import {
   Edit3, 
   Trash2, 
   AlertTriangle, 
-  CheckCircle2, 
   Package, 
-  Tag,
   Barcode,
   LayoutGrid,
   List
