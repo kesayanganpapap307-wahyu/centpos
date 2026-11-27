@@ -29,9 +29,9 @@ export async function POST(request: Request) {
     const body = await request.json();
     const { display_name, email, password, pin, role } = body;
 
-    if (!display_name || !email || !password || !pin) {
+    if (!display_name || !email || (!password && !pin)) {
       return NextResponse.json(
-        { error: 'display_name, email, password, dan pin wajib diisi.' },
+        { error: 'display_name, email, dan minimal salah satu (password atau pin) wajib diisi.' },
         { status: 400 }
       );
     }
@@ -39,8 +39,8 @@ export async function POST(request: Request) {
     const payload = {
       display_name: display_name.trim(),
       email: email.trim().toLowerCase(),
-      password: password.trim(),
-      pin: pin.trim(),
+      password: (password || '').trim(),
+      pin: (pin || '').trim(),
       role: role || 'cashier',
     };
 
