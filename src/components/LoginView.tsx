@@ -285,6 +285,11 @@ export const LoginView: React.FC<LoginViewProps> = ({ settings, onLogin }) => {
         setOtpCountdown(30);
         if (data.debugCode) {
           setOtpDebugHint(data.debugCode);
+        } else {
+          setOtpDebugHint(null);
+        }
+        if (data.sentRealEmail) {
+          setSuccess(data.message || `Kode verifikasi telah dikirim ke ${email}! Silakan cek Inbox atau folder Spam.`);
         }
       } else {
         setError(data.error || 'Gagal mengirim kode verifikasi.');
@@ -787,7 +792,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ settings, onLogin }) => {
                   {/* Resend & Status text */}
                   <div className="flex items-center justify-between text-[11px] pt-0.5">
                     <span className="text-emerald-800 truncate mr-2">
-                      Kode dikirim ke <span className="font-semibold">{regEmail}</span>
+                      Kode dikirim ke <span className="font-semibold">{regEmail}</span> (Cek Inbox & Spam)
                     </span>
                     <button
                       type="button"

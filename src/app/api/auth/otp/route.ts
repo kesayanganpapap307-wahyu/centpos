@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server';
+import { supabase } from '@/lib/supabase';
 
-// Temporary in-memory OTP storage with expiration
-const otpStore = new Map<string, { code: string; expiresAt: number }>();
+// In-memory fallback / backup store
+const backupOtpStore = new Map<string, { code: string; expiresAt: number }>();
 
 export async function POST(request: Request) {
   try {
@@ -19,51 +20,112 @@ export async function POST(request: Request) {
 
     // 1. ACTION: SEND OTP
     if (action === 'send') {
-      // Generate 6-digit OTP
-      const generatedCode = Math.floor(100000 + Math.random() * 900000).toString();
-      
-      // Expire in 10 minutes
-      const expiresAt = Date.now() + 10 * 60 * 1000;
-      otpStore.set(normalizedEmail, { code: generatedCode, expiresAt });
+      let emailSentViaSupabase = false;
+      let supabaseErrorMsg = '';
 
-      console.log(`[CentPOS OTP] Code for ${normalizedEmail}: ${generatedCode}`);
+      if (supabase) {
+        try {
+          const { error } = await supabase.auth.signInWithOtp({
+            email: normalizedEmail,
+            options: {
+              shouldCreateUser: true,
+            },
+          });
 
-      return NextResponse.json({
-        success: true,
-        message: `Kode verifikasi telah dikirim ke ${normalizedEmail}`,
-        // Sertakan code untuk pengujian langsung/demo instan di Vercel
-        debugCode: generatedCode,
+          if (!error) {
+            emailSentViaSupabase = true;
+            console.log(`[CentPOS OTP] Real email sent to: ${normalizedEmail}`);
+          } else {
+            console.warn('[Supabase Auth OTP send warning]:', error.message);
+            supabaseErrorMsg = error.message;
+          }
+        } catch (authErr: any) {
+          console.warn('[Supabase Auth OTP exception]:', authErr);
+          supabaseErrorMsg = authErr?.message || 'Error auth';
+        }
+      }
+
+      // Generate local backup code as well, so if user is in demo mode or Supabase rate-limits, they can still verify
+      const backupCode = Math.floor(100000 + Math.random() * 900000).toString();
+      backupOtpStore.set(normalizedEmail, {
+        code: backupCode,
+        expiresAt: Date.now() + 10 * 60 * 1000,
       });
+
+      if (emailSentViaSupabase) {
+        return NextResponse.json({
+          success: true,
+          sentRealEmail: true,
+          message: `Kode verifikasi 6-digit telah dikirim ke email ${normalizedEmail}. Harap periksa Inbox atau folder Spam / Promosi.`,
+        });
+      } else {
+        // Jika Supabase rate-limited atau gagal kirim email
+        return NextResponse.json({
+          success: true,
+          sentRealEmail: false,
+          warning: supabaseErrorMsg,
+          message: `Kode verifikasi telah dibuat. ${supabaseErrorMsg ? `(Info: ${supabaseErrorMsg})` : ''}`,
+          debugCode: backupCode,
+        });
+      }
     }
 
     // 2. ACTION: VERIFY OTP
     if (action === 'verify') {
-      const stored = otpStore.get(normalizedEmail);
+      const inputCode = (code || '').trim();
 
-      if (!stored) {
+      if (!inputCode || inputCode.length !== 6) {
         return NextResponse.json(
-          { error: 'Kode verifikasi belum dikirim atau telah kadaluarsa. Silakan kirim ulang.' },
+          { error: 'Masukkan 6 digit kode OTP verifikasi.' },
           { status: 400 }
         );
       }
 
-      if (Date.now() > stored.expiresAt) {
-        otpStore.delete(normalizedEmail);
+      let isVerified = false;
+
+      // Coba verifikasi dengan Supabase Auth terlebih dahulu
+      if (supabase) {
+        try {
+          const { data, error } = await supabase.auth.verifyOtp({
+            email: normalizedEmail,
+            token: inputCode,
+            type: 'email',
+          });
+
+          if (!error && (data?.user || data?.session)) {
+            isVerified = true;
+          } else if (error) {
+            console.warn('[Supabase Auth verify email error]:', error.message);
+            // Coba type 'signup' jika diperlukan
+            const retry = await supabase.auth.verifyOtp({
+              email: normalizedEmail,
+              token: inputCode,
+              type: 'signup',
+            });
+            if (!retry.error && (retry.data?.user || retry.data?.session)) {
+              isVerified = true;
+            }
+          }
+        } catch (authErr) {
+          console.warn('[Supabase Auth verify exception]:', authErr);
+        }
+      }
+
+      // Jika belum terverifikasi oleh Supabase, cek backup store
+      if (!isVerified) {
+        const stored = backupOtpStore.get(normalizedEmail);
+        if (stored && Date.now() <= stored.expiresAt && stored.code === inputCode) {
+          isVerified = true;
+          backupOtpStore.delete(normalizedEmail);
+        }
+      }
+
+      if (!isVerified) {
         return NextResponse.json(
-          { error: 'Kode verifikasi telah kadaluarsa (lebih dari 10 menit). Silakan kirim ulang.' },
+          { error: 'Kode verifikasi salah atau telah kadaluarsa. Periksa kembali email Anda atau klik Kirim Ulang.' },
           { status: 400 }
         );
       }
-
-      if (stored.code !== (code || '').trim()) {
-        return NextResponse.json(
-          { error: 'Kode OTP tidak valid atau salah. Silakan periksa kembali email Anda.' },
-          { status: 400 }
-        );
-      }
-
-      // Hapus setelah berhasil diverifikasi
-      otpStore.delete(normalizedEmail);
 
       return NextResponse.json({
         success: true,
