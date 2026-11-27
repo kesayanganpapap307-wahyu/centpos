@@ -11,7 +11,7 @@ import { ReceiptPrint } from '../components/ReceiptPrint';
 import { LoginView } from '../components/LoginView';
 import { Product, Transaction, StoreSettings, AuthUser } from '../types/pos';
 import { initialProducts, initialStoreSettings } from '../data/initialData';
-import { AlertTriangle, Copy, Check } from 'lucide-react';
+import { AlertTriangle, Copy, Check, Wifi, WifiOff, RefreshCw } from 'lucide-react';
 
 export default function Home() {
   const [activeTab, setActiveTab] = useState<'pos' | 'products' | 'reports' | 'settings' | 'deploy'>('pos');
@@ -23,10 +23,33 @@ export default function Home() {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [settings, setSettings] = useState<StoreSettings>(initialStoreSettings);
 
-  // Cloud Sync State
+  // Cloud Sync & Offline-First State
   const [cloudStatus, setCloudStatus] = useState<'connecting' | 'connected' | 'error' | 'offline'>('connecting');
   const [cloudError, setCloudError] = useState<string | null>(null);
   const [copiedSql, setCopiedSql] = useState(false);
+  const [isOnline, setIsOnline] = useState<boolean>(true);
+  const [pendingSyncCount, setPendingSyncCount] = useState<number>(0);
+  const [isSyncing, setIsSyncing] = useState<boolean>(false);
+  const [syncNotice, setSyncNotice] = useState<string | null>(null);
+
+  // Helper Queue Storage Offline
+  const getPendingQueue = (): Transaction[] => {
+    try {
+      const q = localStorage.getItem('centpos_pending_sync_queue');
+      return q ? JSON.parse(q) : [];
+    } catch {
+      return [];
+    }
+  };
+
+  const savePendingQueue = (queue: Transaction[]) => {
+    try {
+      localStorage.setItem('centpos_pending_sync_queue', JSON.stringify(queue));
+      setPendingSyncCount(queue.length);
+    } catch (e) {
+      console.error(e);
+    }
+  };
 
   // Active Receipt Modal
   const [activeReceipt, setActiveReceipt] = useState<Transaction | null>(null);
@@ -167,7 +190,88 @@ CREATE POLICY "Allow all for transaction_items" ON transaction_items FOR ALL TO 
     };
 
     syncCloud();
+
+    // 3. Online/Offline Reconnect Listener & Auto-Sync
+    if (typeof window !== 'undefined') {
+      setIsOnline(navigator.onLine);
+      const queue = getPendingQueue();
+      setPendingSyncCount(queue.length);
+
+      const handleOnline = () => {
+        setIsOnline(true);
+        setCloudStatus('connected');
+        setSyncNotice('Koneksi internet terhubung kembali! Menyinkronkan data...');
+        // Auto-sync immediately upon reconnecting
+        syncPendingTransactionsInternal();
+      };
+
+      const handleOffline = () => {
+        setIsOnline(false);
+        setCloudStatus('offline');
+        setSyncNotice('Koneksi internet terputus. Beralih ke Mode Offline (Data transaksi tetap tersimpan aman di perangkat).');
+      };
+
+      window.addEventListener('online', handleOnline);
+      window.addEventListener('offline', handleOffline);
+
+      // Periodic check every 25 seconds if online and there are pending items
+      const autoSyncInterval = setInterval(() => {
+        if (navigator.onLine && getPendingQueue().length > 0) {
+          syncPendingTransactionsInternal();
+        }
+      }, 25000);
+
+      return () => {
+        window.removeEventListener('online', handleOnline);
+        window.removeEventListener('offline', handleOffline);
+        clearInterval(autoSyncInterval);
+      };
+    }
   }, []);
+
+  // Sync Pending Transactions to Supabase
+  const syncPendingTransactionsInternal = async () => {
+    const queue = getPendingQueue();
+    if (queue.length === 0) return;
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      setSyncNotice('Tidak dapat menyinkronkan: perangkat sedang offline.');
+      return;
+    }
+
+    setIsSyncing(true);
+    let successCount = 0;
+    const remaining: Transaction[] = [];
+
+    for (const trx of queue) {
+      try {
+        const res = await fetch('/api/transactions', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(trx),
+        });
+
+        if (res.ok) {
+          successCount++;
+        } else {
+          remaining.push(trx);
+        }
+      } catch (err) {
+        remaining.push(trx);
+      }
+    }
+
+    savePendingQueue(remaining);
+    setIsSyncing(false);
+
+    if (successCount > 0) {
+      setSyncNotice(`✅ Sukses menyinkronkan ${successCount} transaksi offline ke Supabase Cloud!`);
+      setTimeout(() => setSyncNotice(null), 6000);
+    }
+  };
+
+  const handleManualSync = () => {
+    syncPendingTransactionsInternal();
+  };
 
   // Save to localStorage
   const saveProductsLocally = (newProducts: Product[]) => {
@@ -286,15 +390,33 @@ CREATE POLICY "Allow all for transaction_items" ON transaction_items FOR ALL TO 
     const updated = [trxWithCashier, ...transactions];
     saveTransactionsLocally(updated);
 
-    // Sync to Supabase
+    // Cek jika sedang offline: simpan ke antrean offline
+    const isCurrentlyOffline = typeof navigator !== 'undefined' && !navigator.onLine;
+    if (isCurrentlyOffline) {
+      const queue = getPendingQueue();
+      const newQueue = [...queue, trxWithCashier];
+      savePendingQueue(newQueue);
+      setSyncNotice(`Transaksi ${trxWithCashier.invoiceNumber} disimpan offline (${newQueue.length} transaksi dalam antrean sinkronisasi).`);
+      return;
+    }
+
+    // Jika online, kirim ke Supabase via /api/transactions
     try {
-      await fetch('/api/transactions', {
+      const res = await fetch('/api/transactions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(trxWithCashier),
       });
+
+      if (!res.ok) {
+        throw new Error('Supabase responded with non-OK');
+      }
     } catch (e) {
-      console.warn('Could not sync transaction to cloud:', e);
+      console.warn('Gagal sinkron langsung ke cloud, memasukkan ke antrean offline:', e);
+      const queue = getPendingQueue();
+      const newQueue = [...queue, trxWithCashier];
+      savePendingQueue(newQueue);
+      setSyncNotice(`Koneksi terganggu: Transaksi disimpan di antrean offline (${newQueue.length} tertunda).`);
     }
   };
 
@@ -410,10 +532,45 @@ CREATE POLICY "Allow all for transaction_items" ON transaction_items FOR ALL TO 
         cloudStatus={cloudStatus}
         currentUser={currentUser}
         onLogout={handleLogout}
+        isOnline={isOnline}
+        pendingSyncCount={pendingSyncCount}
+        isSyncing={isSyncing}
+        onManualSync={handleManualSync}
       />
 
       {/* Main Content Area */}
       <div className="flex-1 flex flex-col min-w-0">
+        {/* Offline Alert / Sync Notice Banner */}
+        {syncNotice && (
+          <div className="bg-emerald-600 text-white px-4 py-2.5 text-xs font-semibold flex items-center justify-between shadow-sm animate-fadeIn">
+            <div className="flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-white animate-ping" />
+              <span>{syncNotice}</span>
+            </div>
+            <button
+              onClick={() => setSyncNotice(null)}
+              className="px-2 py-0.5 text-emerald-100 hover:text-white hover:bg-emerald-700 rounded-md transition-colors text-xs"
+            >
+              ✕
+            </button>
+          </div>
+        )}
+
+        {/* Offline Mode Indicator Banner (Ketika Benar-Benar Putus Internet) */}
+        {!isOnline && (
+          <div className="bg-amber-500 text-slate-950 px-4 py-2.5 text-xs font-bold flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 border-b border-amber-600 shadow-sm">
+            <div className="flex items-center gap-2">
+              <WifiOff className="w-4 h-4 shrink-0 text-slate-950" />
+              <span>
+                Mode Offline Aktif: Internet tidak terhubung. Kasir tetap bisa jualan normal! Seluruh transaksi disimpan aman di perangkat ({pendingSyncCount} antrean).
+              </span>
+            </div>
+            <span className="px-2.5 py-1 bg-slate-900 text-white rounded-lg text-[11px] font-mono shrink-0">
+              Otomatis sinkron saat online
+            </span>
+          </div>
+        )}
+
         {/* Cloud Status Alert Banner (if Supabase permissions are missing) */}
         {cloudStatus === 'error' && (
           <div className="bg-amber-500 text-slate-950 px-4 py-3 border-b border-amber-600 shadow-sm">

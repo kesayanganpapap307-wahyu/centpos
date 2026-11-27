@@ -14,6 +14,8 @@ import {
   X,
   ChevronRight,
   LogOut,
+  WifiOff,
+  RefreshCw,
 } from 'lucide-react';
 import { StoreSettings, AuthUser } from '../types/pos';
 
@@ -25,6 +27,10 @@ interface SidebarProps {
   cloudStatus?: 'connecting' | 'connected' | 'error' | 'offline';
   currentUser?: AuthUser | null;
   onLogout?: () => void;
+  isOnline?: boolean;
+  pendingSyncCount?: number;
+  isSyncing?: boolean;
+  onManualSync?: () => void;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -35,6 +41,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
   cloudStatus = 'connected',
   currentUser,
   onLogout,
+  isOnline = true,
+  pendingSyncCount = 0,
+  isSyncing = false,
+  onManualSync,
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [time, setTime] = useState<string>('');
@@ -124,16 +134,37 @@ export const Sidebar: React.FC<SidebarProps> = ({
         </div>
 
         <div className="flex items-center gap-2">
-          <span
-            className={`inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full border ${
-              cloudStatus === 'error'
-                ? 'bg-rose-50 text-rose-700 border-rose-200'
-                : 'bg-emerald-50 text-emerald-700 border-emerald-200'
-            }`}
-          >
-            <Wifi className="w-3 h-3 text-emerald-500 animate-pulse" />
-            <span>Online</span>
-          </span>
+          {/* Status Badge Mobile */}
+          {!isOnline ? (
+            <span className="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full border bg-amber-50 text-amber-800 border-amber-300">
+              <WifiOff className="w-3 h-3 text-amber-600" />
+              <span>Offline {pendingSyncCount > 0 ? `(${pendingSyncCount})` : ''}</span>
+            </span>
+          ) : isSyncing ? (
+            <span className="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full border bg-blue-50 text-blue-700 border-blue-200">
+              <RefreshCw className="w-3 h-3 text-blue-600 animate-spin" />
+              <span>Sinkron...</span>
+            </span>
+          ) : pendingSyncCount > 0 ? (
+            <button
+              onClick={onManualSync}
+              className="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full border bg-amber-500 text-white border-amber-600 hover:bg-amber-600 transition-colors shadow-2xs"
+            >
+              <RefreshCw className="w-3 h-3" />
+              <span>Sinkron ({pendingSyncCount})</span>
+            </button>
+          ) : (
+            <span
+              className={`inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full border ${
+                cloudStatus === 'error'
+                  ? 'bg-rose-50 text-rose-700 border-rose-200'
+                  : 'bg-emerald-50 text-emerald-700 border-emerald-200'
+              }`}
+            >
+              <Wifi className="w-3 h-3 text-emerald-500 animate-pulse" />
+              <span>Online</span>
+            </span>
+          )}
 
           <span className="font-mono text-xs text-slate-600 bg-slate-100 px-2 py-1 rounded-md">
             {time.slice(0, 5)}
@@ -279,8 +310,22 @@ export const Sidebar: React.FC<SidebarProps> = ({
               {settings.storeName}
             </h1>
             <div className="flex items-center gap-1.5 mt-0.5">
-              <span className="inline-block w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-              <p className="text-xs text-slate-500 font-medium">Cloud Online</p>
+              {!isOnline ? (
+                <>
+                  <span className="inline-block w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
+                  <p className="text-xs text-amber-700 font-semibold">Mode Offline</p>
+                </>
+              ) : isSyncing ? (
+                <>
+                  <RefreshCw className="w-3 h-3 text-blue-600 animate-spin" />
+                  <p className="text-xs text-blue-600 font-semibold">Menyinkronkan...</p>
+                </>
+              ) : (
+                <>
+                  <span className="inline-block w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                  <p className="text-xs text-slate-500 font-medium">Cloud Online</p>
+                </>
+              )}
             </div>
           </div>
         </div>
@@ -327,6 +372,62 @@ export const Sidebar: React.FC<SidebarProps> = ({
             );
           })}
         </nav>
+
+        {/* Offline Sync Status Widget in Desktop Sidebar */}
+        <div className="p-3 border-t border-slate-100 bg-slate-50/50">
+          <div className={`p-3 rounded-xl border text-xs ${
+            !isOnline
+              ? 'bg-amber-50/80 border-amber-200 text-amber-900'
+              : pendingSyncCount > 0
+              ? 'bg-blue-50/80 border-blue-200 text-blue-900'
+              : 'bg-emerald-50/50 border-emerald-100 text-emerald-900'
+          }`}>
+            <div className="flex items-center justify-between mb-1.5">
+              <span className="font-bold flex items-center gap-1.5 text-[11px]">
+                {!isOnline ? (
+                  <>
+                    <WifiOff className="w-3.5 h-3.5 text-amber-600" />
+                    <span>Mode Offline</span>
+                  </>
+                ) : isSyncing ? (
+                  <>
+                    <RefreshCw className="w-3.5 h-3.5 text-blue-600 animate-spin" />
+                    <span>Menyinkronkan...</span>
+                  </>
+                ) : (
+                  <>
+                    <Wifi className="w-3.5 h-3.5 text-emerald-600" />
+                    <span>Sinkronisasi Otomatis</span>
+                  </>
+                )}
+              </span>
+              <span className={`px-1.5 py-0.5 rounded text-[10px] font-mono font-bold ${
+                pendingSyncCount > 0 ? 'bg-amber-200 text-amber-900' : 'bg-emerald-100 text-emerald-800'
+              }`}>
+                {pendingSyncCount} Antrean
+              </span>
+            </div>
+
+            <p className="text-[11px] leading-relaxed text-slate-500 mb-2">
+              {!isOnline
+                ? 'Toko tetap bisa jualan. Data transaksi tersimpan aman di browser & auto-upload saat online.'
+                : pendingSyncCount > 0
+                ? `${pendingSyncCount} transaksi offline menunggu dikirim ke Supabase.`
+                : 'Semua transaksi offline telah tersinkron aman ke database cloud.'}
+            </p>
+
+            {pendingSyncCount > 0 && onManualSync && (
+              <button
+                onClick={onManualSync}
+                disabled={isSyncing || !isOnline}
+                className="w-full flex items-center justify-center gap-1.5 py-1.5 px-3 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-bold rounded-lg transition-colors text-[11px] shadow-xs"
+              >
+                <RefreshCw className={`w-3 h-3 ${isSyncing ? 'animate-spin' : ''}`} />
+                <span>{isSyncing ? 'Sedang Sinkron...' : 'Sinkronkan Sekarang'}</span>
+              </button>
+            )}
+          </div>
+        </div>
 
         {/* Cashier & Clock Footer */}
         <div className="p-4 border-t border-slate-100 bg-slate-50/70 space-y-2">
