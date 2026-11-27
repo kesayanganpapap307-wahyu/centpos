@@ -15,7 +15,8 @@ import {
   Percent, 
   RotateCcw,
   Sparkles,
-  Barcode
+  Barcode,
+  Upload
 } from 'lucide-react';
 import { Product, CartItem, Category, StoreSettings, Transaction, PaymentMethod } from '../types/pos';
 import { formatCurrency, generateInvoiceNumber } from '../utils/format';
@@ -25,6 +26,7 @@ interface CashierViewProps {
   onUpdateProductStock: (productId: string, quantityDeducted: number) => void;
   onSaveTransaction: (transaction: Transaction) => void;
   settings: StoreSettings;
+  onSaveSettings?: (settings: StoreSettings) => void;
   onOpenReceipt: (transaction: Transaction) => void;
 }
 
@@ -33,6 +35,7 @@ export const CashierView: React.FC<CashierViewProps> = ({
   onUpdateProductStock,
   onSaveTransaction,
   settings,
+  onSaveSettings,
   onOpenReceipt,
 }) => {
   // State
@@ -611,11 +614,70 @@ export const CashierView: React.FC<CashierViewProps> = ({
 
               {/* QRIS / Transfer details */}
               {paymentMethod === 'QRIS' && (
-                <div className="text-center p-4 bg-slate-50 rounded-xl border border-slate-200 space-y-2">
-                  <div className="w-32 h-32 mx-auto bg-white p-2 rounded-xl border border-slate-300 flex items-center justify-center">
-                    <QrCode className="w-24 h-24 text-slate-800" />
+                <div className="text-center p-4 bg-slate-50 rounded-2xl border border-slate-200 space-y-3">
+                  <div className="flex items-center justify-between text-xs font-bold text-slate-800 px-1">
+                    <span className="flex items-center gap-1.5">
+                      <QrCode className="w-4 h-4 text-teal-600" />
+                      <span>Scan QRIS Kasir Toko</span>
+                    </span>
+                    <span className="text-[11px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">
+                      Total: {formatCurrency(totalAmount)}
+                    </span>
                   </div>
-                  <p className="text-xs font-semibold text-slate-700">Scan QRIS Kasir Toko</p>
+
+                  {/* QR Image Box */}
+                  <div className="mx-auto bg-white p-3 rounded-2xl border border-slate-200 shadow-xs max-w-[220px] flex flex-col items-center justify-center">
+                    {settings.qrisImage ? (
+                      /* eslint-disable-next-line @next/next/no-img-element */
+                      <img
+                        src={settings.qrisImage}
+                        alt="QRIS Toko"
+                        className="w-full max-h-52 object-contain rounded-lg"
+                      />
+                    ) : (
+                      <div className="py-4 text-center text-slate-400">
+                        <QrCode className="w-24 h-24 mx-auto text-slate-300 stroke-[1.2] mb-1" />
+                        <p className="text-[11px] text-slate-500 font-medium">
+                          Foto QRIS belum di-upload
+                        </p>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Quick Upload or Change QRIS directly from Cashier */}
+                  {onSaveSettings && (
+                    <div className="pt-0.5">
+                      <input
+                        type="file"
+                        id="quick-qris-upload"
+                        accept="image/png,image/jpeg,image/webp"
+                        className="hidden"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (!file) return;
+                          if (file.size > 3 * 1024 * 1024) {
+                            alert('Ukuran gambar maksimal 3 MB.');
+                            return;
+                          }
+                          const reader = new FileReader();
+                          reader.onload = () => {
+                            if (typeof reader.result === 'string') {
+                              onSaveSettings({ ...settings, qrisImage: reader.result as string });
+                            }
+                          };
+                          reader.readAsDataURL(file);
+                        }}
+                      />
+                      <label
+                        htmlFor="quick-qris-upload"
+                        className="inline-flex items-center gap-1 text-[11px] font-bold text-teal-700 hover:text-teal-800 bg-teal-50 hover:bg-teal-100 border border-teal-200 px-3 py-1.5 rounded-xl cursor-pointer transition-all active:scale-95"
+                      >
+                        <Upload className="w-3.5 h-3.5" />
+                        <span>{settings.qrisImage ? 'Ganti Foto QRIS' : 'Upload Foto QRIS Toko'}</span>
+                      </label>
+                    </div>
+                  )}
+
                   <p className="text-[11px] text-slate-500">
                     Mendukung GoPay, OVO, Dana, BCA, Mandiri, ShopeePay
                   </p>

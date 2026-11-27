@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { 
   Settings, 
   Store, 
@@ -9,7 +9,10 @@ import {
   RotateCcw, 
   Save, 
   ShieldCheck,
-  Receipt
+  Receipt,
+  QrCode,
+  Upload,
+  Trash2
 } from 'lucide-react';
 import { StoreSettings } from '../types/pos';
 
@@ -26,6 +29,37 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
 }) => {
   const [formData, setFormData] = useState<StoreSettings>({ ...settings });
   const [isSaved, setIsSaved] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleQrisUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      alert('Harap pilih file gambar (PNG, JPG, atau WebP).');
+      return;
+    }
+
+    if (file.size > 3 * 1024 * 1024) {
+      alert('Ukuran gambar terlalu besar (maksimal 3 MB).');
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result === 'string') {
+        setFormData((prev) => ({ ...prev, qrisImage: reader.result as string }));
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleRemoveQris = () => {
+    setFormData((prev) => ({ ...prev, qrisImage: '' }));
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -174,6 +208,76 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                 onChange={(e) => setFormData({ ...formData, receiptFooter: e.target.value })}
                 className="w-full px-3.5 py-2.5 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-emerald-500 focus:outline-hidden"
               />
+            </div>
+          </div>
+        </div>
+
+        {/* QRIS Statis Toko */}
+        <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-xs space-y-4">
+          <div className="flex items-center gap-2 border-b border-slate-100 pb-3">
+            <QrCode className="w-5 h-5 text-teal-600" />
+            <h3 className="font-bold text-sm text-slate-900">QRIS Pembayaran Toko (Statis)</h3>
+          </div>
+
+          <div className="space-y-3 text-xs">
+            <p className="text-slate-500">
+              Upload foto kode QRIS toko Anda (BCA, GoPay, Dana, OVO, ShopeePay, Bank Mandiri, dll). Gambar ini akan otomatis muncul di layar kasir saat pelanggan memilih pembayaran QRIS agar bisa langsung di-scan.
+            </p>
+
+            <div className="flex flex-col sm:flex-row items-center gap-5 p-4 bg-slate-50 border border-slate-200 rounded-2xl">
+              {/* Preview Box */}
+              <div className="w-36 h-36 bg-white rounded-xl border border-slate-300 flex items-center justify-center p-2 shadow-xs shrink-0 overflow-hidden relative group">
+                {formData.qrisImage ? (
+                  /* eslint-disable-next-line @next/next/no-img-element */
+                  <img
+                    src={formData.qrisImage}
+                    alt="QRIS Toko"
+                    className="w-full h-full object-contain rounded-lg"
+                  />
+                ) : (
+                  <div className="text-center p-2 text-slate-400">
+                    <QrCode className="w-12 h-12 mx-auto stroke-1 mb-1 text-slate-300" />
+                    <span className="text-[10px] block leading-tight font-medium">Belum ada QRIS</span>
+                  </div>
+                )}
+              </div>
+
+              {/* Upload Controls */}
+              <div className="space-y-2.5 flex-1 w-full text-center sm:text-left">
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/png,image/jpeg,image/webp"
+                  onChange={handleQrisUpload}
+                  className="hidden"
+                />
+
+                <div className="flex flex-wrap items-center gap-2 justify-center sm:justify-start">
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    className="flex items-center gap-1.5 px-3.5 py-2 bg-teal-600 hover:bg-teal-700 active:scale-95 text-white rounded-xl font-bold text-xs transition-all shadow-xs"
+                  >
+                    <Upload className="w-3.5 h-3.5" />
+                    <span>{formData.qrisImage ? 'Ganti Foto QRIS' : 'Upload Foto QRIS Toko'}</span>
+                  </button>
+
+                  {formData.qrisImage && (
+                    <button
+                      type="button"
+                      onClick={handleRemoveQris}
+                      className="flex items-center gap-1 px-3 py-2 text-rose-600 hover:bg-rose-50 border border-rose-200 rounded-xl font-semibold text-xs transition-colors"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                      <span>Hapus Foto</span>
+                    </button>
+                  )}
+                </div>
+
+                <p className="text-[11px] text-slate-500">
+                  Format yang didukung: <b>PNG, JPG, WebP</b> (Maksimal 3 MB). Pastikan barcode QRIS terlihat tajam dan jelas agar kamera pelanggan mudah membaca kode.
+                </p>
+              </div>
             </div>
           </div>
         </div>

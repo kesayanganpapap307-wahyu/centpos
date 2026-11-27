@@ -54,6 +54,7 @@ export interface StoreSettings {
   receiptFooter: string;
   currency: string;
   paperSize: '58mm' | '80mm';
+  qrisImage?: string; // Data URL or URL of uploaded QRIS
 }
 
 export interface AuthUser {

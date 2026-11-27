@@ -454,6 +454,7 @@ CREATE POLICY "Allow all for transaction_items" ON transaction_items FOR ALL TO 
               onUpdateProductStock={handleUpdateProductStock}
               onSaveTransaction={handleSaveTransaction}
               settings={settings}
+              onSaveSettings={saveSettingsLocally}
               onOpenReceipt={(trx) => setActiveReceipt(trx)}
             />
           )}
