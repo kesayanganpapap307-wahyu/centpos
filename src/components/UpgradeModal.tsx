@@ -28,8 +28,8 @@ export const UpgradeModal: React.FC<UpgradeModalProps> = ({
   ];
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs animate-in fade-in duration-200">
-      <div className="bg-white rounded-3xl shadow-2xl max-w-md w-full overflow-hidden border border-slate-100 flex flex-col relative animate-in zoom-in-95 duration-150">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-3 sm:p-4 backdrop-blur-xs animate-in fade-in duration-200">
+      <div className="bg-white rounded-3xl shadow-2xl max-w-md w-full max-h-[92vh] overflow-hidden border border-slate-100 flex flex-col relative animate-in zoom-in-95 duration-150">
         {/* Close Button */}
         <button
           onClick={onClose}
@@ -39,12 +39,12 @@ export const UpgradeModal: React.FC<UpgradeModalProps> = ({
         </button>
 
         {/* Premium Header */}
-        <div className="bg-gradient-to-br from-indigo-700 via-blue-700 to-indigo-900 p-6 text-white text-center relative overflow-hidden">
+        <div className="bg-gradient-to-br from-indigo-700 via-blue-700 to-indigo-900 p-5 sm:p-6 text-white text-center relative overflow-hidden shrink-0">
           <div className="absolute -right-8 -bottom-8 w-32 h-32 bg-white/10 rounded-full blur-xl pointer-events-none" />
           <div className="absolute -left-8 -top-8 w-32 h-32 bg-blue-400/20 rounded-full blur-xl pointer-events-none" />
 
-          <div className="w-14 h-14 bg-white/20 backdrop-blur-md rounded-2xl mx-auto flex items-center justify-center text-amber-300 mb-3 shadow-inner border border-white/20">
-            <Crown className="w-8 h-8 drop-shadow-md" />
+          <div className="w-12 h-12 sm:w-14 sm:h-14 bg-white/20 backdrop-blur-md rounded-2xl mx-auto flex items-center justify-center text-amber-300 mb-2.5 shadow-inner border border-white/20">
+            <Crown className="w-7 h-7 sm:w-8 sm:h-8 drop-shadow-md" />
           </div>
 
           <div className="inline-flex items-center gap-1 bg-amber-400/20 text-amber-200 text-[10px] font-bold px-2.5 py-0.5 rounded-full border border-amber-300/30 mb-2 uppercase tracking-wider">
@@ -52,14 +52,14 @@ export const UpgradeModal: React.FC<UpgradeModalProps> = ({
             <span>Modul Add-On Premium</span>
           </div>
 
-          <h3 className="text-xl font-bold tracking-tight">Multi-Tier Pricing</h3>
+          <h3 className="text-lg sm:text-xl font-bold tracking-tight">Multi-Tier Pricing</h3>
           <p className="text-blue-100 text-xs mt-1 max-w-xs mx-auto">
             Buka kunci fitur harga khusus untuk Agen, Reseller, dan Member Toko Anda.
           </p>
         </div>
 
         {/* Content Body */}
-        <div className="p-6 space-y-4 text-xs">
+        <div className="p-4 sm:p-6 space-y-4 text-xs overflow-y-auto flex-1 overscroll-contain">
           {/* Benefit Checklist */}
           <div className="space-y-2.5">
             <span className="font-bold text-slate-800 block text-xs">
