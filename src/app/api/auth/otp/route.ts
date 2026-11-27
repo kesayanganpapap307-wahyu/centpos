@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 
-// In-memory fallback / backup store
+// In-memory backup OTP store
 const backupOtpStore = new Map<string, { code: string; expiresAt: number }>();
 
 export async function POST(request: Request) {
@@ -21,6 +21,7 @@ export async function POST(request: Request) {
     // 1. ACTION: SEND OTP
     if (action === 'send') {
       let emailSentViaSupabase = false;
+      let isRateLimited = false;
       let supabaseErrorMsg = '';
 
       if (supabase) {
@@ -36,35 +37,43 @@ export async function POST(request: Request) {
             emailSentViaSupabase = true;
             console.log(`[CentPOS OTP] Real email sent to: ${normalizedEmail}`);
           } else {
-            console.warn('[Supabase Auth OTP send warning]:', error.message);
+            console.warn('[Supabase Auth OTP send warning]:', error.message, error.status);
             supabaseErrorMsg = error.message;
+            if (error.status === 429 || error.message?.toLowerCase().includes('rate limit')) {
+              isRateLimited = true;
+            }
           }
         } catch (authErr: any) {
           console.warn('[Supabase Auth OTP exception]:', authErr);
           supabaseErrorMsg = authErr?.message || 'Error auth';
+          if (supabaseErrorMsg.toLowerCase().includes('rate limit')) {
+            isRateLimited = true;
+          }
         }
       }
 
-      // Generate local backup code as well, so if user is in demo mode or Supabase rate-limits, they can still verify
+      // Generate local backup code
       const backupCode = Math.floor(100000 + Math.random() * 900000).toString();
       backupOtpStore.set(normalizedEmail, {
         code: backupCode,
-        expiresAt: Date.now() + 10 * 60 * 1000,
+        expiresAt: Date.now() + 15 * 60 * 1000,
       });
 
       if (emailSentViaSupabase) {
         return NextResponse.json({
           success: true,
           sentRealEmail: true,
-          message: `Kode verifikasi 6-digit telah dikirim ke email ${normalizedEmail}. Harap periksa Inbox atau folder Spam / Promosi.`,
+          message: `Kode verifikasi 6-digit telah dikirim ke email ${normalizedEmail}. Harap periksa Inbox atau folder Spam.`,
         });
       } else {
-        // Jika Supabase rate-limited atau gagal kirim email
         return NextResponse.json({
           success: true,
           sentRealEmail: false,
+          isRateLimited: isRateLimited,
           warning: supabaseErrorMsg,
-          message: `Kode verifikasi telah dibuat. ${supabaseErrorMsg ? `(Info: ${supabaseErrorMsg})` : ''}`,
+          message: isRateLimited
+            ? 'Batas kuota email bawaan Supabase (3 email/jam) sedang penuh. Gunakan kode verifikasi di bawah ini untuk melanjutkan pendaftaran:'
+            : `Gagal mengirim email: ${supabaseErrorMsg}. Gunakan kode verifikasi di bawah ini:`,
           debugCode: backupCode,
         });
       }
@@ -83,7 +92,7 @@ export async function POST(request: Request) {
 
       let isVerified = false;
 
-      // Coba verifikasi dengan Supabase Auth terlebih dahulu
+      // Coba verifikasi dengan Supabase Auth terlebih dahulu jika berhasil terkirim via Supabase
       if (supabase) {
         try {
           const { data, error } = await supabase.auth.verifyOtp({
@@ -95,8 +104,6 @@ export async function POST(request: Request) {
           if (!error && (data?.user || data?.session)) {
             isVerified = true;
           } else if (error) {
-            console.warn('[Supabase Auth verify email error]:', error.message);
-            // Coba type 'signup' jika diperlukan
             const retry = await supabase.auth.verifyOtp({
               email: normalizedEmail,
               token: inputCode,
@@ -111,7 +118,7 @@ export async function POST(request: Request) {
         }
       }
 
-      // Jika belum terverifikasi oleh Supabase, cek backup store
+      // Jika belum terverifikasi oleh Supabase (atau fallback karena rate limit), cek backup store
       if (!isVerified) {
         const stored = backupOtpStore.get(normalizedEmail);
         if (stored && Date.now() <= stored.expiresAt && stored.code === inputCode) {
@@ -122,7 +129,7 @@ export async function POST(request: Request) {
 
       if (!isVerified) {
         return NextResponse.json(
-          { error: 'Kode verifikasi salah atau telah kadaluarsa. Periksa kembali email Anda atau klik Kirim Ulang.' },
+          { error: 'Kode verifikasi salah atau telah kadaluarsa. Periksa kembali atau klik Kirim Ulang.' },
           { status: 400 }
         );
       }

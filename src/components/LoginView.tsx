@@ -288,8 +288,8 @@ export const LoginView: React.FC<LoginViewProps> = ({ settings, onLogin }) => {
         } else {
           setOtpDebugHint(null);
         }
-        if (data.sentRealEmail) {
-          setSuccess(data.message || `Kode verifikasi telah dikirim ke ${email}! Silakan cek Inbox atau folder Spam.`);
+        if (data.message) {
+          setSuccess(data.message);
         }
       } else {
         setError(data.error || 'Gagal mengirim kode verifikasi.');
@@ -778,14 +778,29 @@ export const LoginView: React.FC<LoginViewProps> = ({ settings, onLogin }) => {
 
                   {/* Hint Demo Code untuk kemudahan pengujian instan */}
                   {otpDebugHint && (
-                    <div className="p-2 bg-amber-50 border border-amber-200 rounded-lg text-[11px] text-amber-800 flex items-center justify-between">
-                      <span className="flex items-center gap-1 font-medium">
-                        <Sparkles className="w-3.5 h-3.5 text-amber-600" />
-                        <span>Kode OTP Anda:</span>
-                      </span>
-                      <span className="font-mono font-bold text-sm tracking-wider bg-white px-2 py-0.5 rounded border border-amber-300 text-slate-900">
-                        {otpDebugHint}
-                      </span>
+                    <div className="p-2.5 bg-amber-50 border border-amber-300 rounded-xl text-xs text-amber-900 space-y-1.5 animate-in fade-in">
+                      <div className="flex items-center justify-between">
+                        <span className="flex items-center gap-1 font-semibold text-[11px] text-amber-800">
+                          <Sparkles className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                          <span>Kode Verifikasi (Bypass Limit Email):</span>
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => setOtpCode(otpDebugHint)}
+                          className="text-[10px] bg-amber-200/80 hover:bg-amber-300 font-bold px-2 py-0.5 rounded text-amber-950 transition-all active:scale-95"
+                        >
+                          Isi Otomatis
+                        </button>
+                      </div>
+                      <div className="flex items-center justify-between bg-white px-2.5 py-1.5 rounded-lg border border-amber-200">
+                        <span className="text-[11px] text-slate-500">Kode OTP Anda:</span>
+                        <span className="font-mono font-bold text-base tracking-widest text-slate-900">
+                          {otpDebugHint}
+                        </span>
+                      </div>
+                      <p className="text-[10px] text-amber-700 leading-tight">
+                        * Kuota email bawaan Supabase Free Tier dibatasi 3 email/jam. Anda dapat memasukkan kode ini langsung atau klik &quot;Isi Otomatis&quot;.
+                      </p>
                     </div>
                   )}
 
