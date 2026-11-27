@@ -15,7 +15,9 @@ import {
   User,
   Eye,
   EyeOff,
-  Check
+  Check,
+  Send,
+  Sparkles
 } from 'lucide-react';
 import { AuthUser, StoreSettings } from '../types/pos';
 
@@ -68,6 +70,20 @@ export const LoginView: React.FC<LoginViewProps> = ({ settings, onLogin }) => {
   const [regEmail, setRegEmail] = useState('');
   const [regRole, setRegRole] = useState<'owner' | 'cashier'>('cashier');
 
+  // ==========================================
+  // State Email Verification (OTP)
+  // ==========================================
+  // 'idle' = Belum kirim kode
+  // 'sent' = Kode dikirim, tombol berubah jadi "Verify OTP" & muncul input OTP
+  // 'verified' = Email sukses diverifikasi
+  const [otpState, setOtpState] = useState<'idle' | 'sent' | 'verified'>('idle');
+  const [otpCode, setOtpCode] = useState('');
+  const [otpCountdown, setOtpCountdown] = useState(0);
+  const [otpError, setOtpError] = useState<string | null>(null);
+  const [otpDebugHint, setOtpDebugHint] = useState<string | null>(null);
+  const [isSendingOtp, setIsSendingOtp] = useState(false);
+  const [isVerifyingOtp, setIsVerifyingOtp] = useState(false);
+
   // Toggle Pilihan Keamanan (Use Password & Use PIN)
   const [usePassword, setUsePassword] = useState(true);
   const [usePin, setUsePin] = useState(true);
@@ -91,6 +107,14 @@ export const LoginView: React.FC<LoginViewProps> = ({ settings, onLogin }) => {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+
+  // Countdown timer untuk kirim ulang kode OTP
+  useEffect(() => {
+    if (otpCountdown > 0) {
+      const timer = setTimeout(() => setOtpCountdown(otpCountdown - 1), 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [otpCountdown]);
 
   // 1. Fetch users from Supabase Cloud on mount
   useEffect(() => {
@@ -156,7 +180,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ settings, onLogin }) => {
     setError(null);
   };
 
-  // Verifikasi PIN
+  // Verifikasi PIN Sign In
   const verifyPin = (pinToTest: string) => {
     const matched = allUsers.find((u) => u.pin === pinToTest);
     if (matched) {
@@ -192,6 +216,87 @@ export const LoginView: React.FC<LoginViewProps> = ({ settings, onLogin }) => {
     }
   };
 
+  // ============================================================
+  // FUNGSI 1: SEND VERIFICATION CODE
+  // ============================================================
+  const handleSendVerificationCode = async () => {
+    setError(null);
+    setOtpError(null);
+    const email = regEmail.trim().toLowerCase();
+
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      setError('Masukkan alamat email yang valid terlebih dahulu.');
+      return;
+    }
+
+    if (allUsers.some((u) => u.email?.toLowerCase() === email)) {
+      setError(`Email "${email}" sudah terdaftar. Silakan gunakan email lain.`);
+      return;
+    }
+
+    setIsSendingOtp(true);
+    try {
+      const res = await fetch('/api/auth/otp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'send', email }),
+      });
+
+      const data = await res.json();
+      if (res.ok) {
+        setOtpState('sent');
+        setOtpCountdown(30);
+        if (data.debugCode) {
+          setOtpDebugHint(data.debugCode);
+        }
+      } else {
+        setError(data.error || 'Gagal mengirim kode verifikasi.');
+      }
+    } catch (err) {
+      console.error(err);
+      setError('Terjadi kendala saat mengirim kode ke email.');
+    } finally {
+      setIsSendingOtp(false);
+    }
+  };
+
+  // ============================================================
+  // FUNGSI 2: VERIFY OTP
+  // ============================================================
+  const handleVerifyOtp = async () => {
+    setOtpError(null);
+    const code = otpCode.trim();
+    const email = regEmail.trim().toLowerCase();
+
+    if (!code || code.length !== 6) {
+      setOtpError('Masukkan 6 digit kode OTP verifikasi.');
+      return;
+    }
+
+    setIsVerifyingOtp(true);
+    try {
+      const res = await fetch('/api/auth/otp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'verify', email, code }),
+      });
+
+      const data = await res.json();
+      if (res.ok && data.verified) {
+        setOtpState('verified');
+        setOtpError(null);
+        setOtpDebugHint(null);
+      } else {
+        setOtpError(data.error || 'Kode OTP salah atau telah kadaluarsa.');
+      }
+    } catch (err) {
+      console.error(err);
+      setOtpError('Gagal memverifikasi kode OTP.');
+    } finally {
+      setIsVerifyingOtp(false);
+    }
+  };
+
   // Handle Registrasi Akun Baru (Sign Up) ke Supabase Table 'users'
   const handleSignUpSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -203,6 +308,13 @@ export const LoginView: React.FC<LoginViewProps> = ({ settings, onLogin }) => {
 
     if (!displayName || !email) {
       setError('Nama Tampilan dan Alamat Email wajib diisi.');
+      setIsLoading(false);
+      return;
+    }
+
+    // WAJIB VERIFIKASI EMAIL
+    if (otpState !== 'verified') {
+      setError('Harap klik "Send Verification Code" dan verifikasi kode OTP email Anda terlebih dahulu.');
       setIsLoading(false);
       return;
     }
@@ -394,22 +506,136 @@ export const LoginView: React.FC<LoginViewProps> = ({ settings, onLogin }) => {
                 </div>
               </div>
 
-              {/* Alamat Email */}
+              {/* ============================================================ */}
+              {/* ALAMAT EMAIL + TOMBOL SEND CODE / VERIFY OTP                 */}
+              {/* ============================================================ */}
               <div>
-                <label className="block font-semibold text-slate-700 mb-1">
-                  Alamat Email (email) *
-                </label>
-                <div className="relative">
-                  <Mail className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-                  <input
-                    type="email"
-                    required
-                    placeholder="Contoh: budi@gmail.com"
-                    value={regEmail}
-                    onChange={(e) => setRegEmail(e.target.value)}
-                    className="w-full pl-10 pr-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-hidden focus:ring-2 focus:ring-emerald-500 focus:bg-white"
-                  />
+                <div className="flex items-center justify-between mb-1">
+                  <label className="font-semibold text-slate-700">
+                    Alamat Email (email) *
+                  </label>
+                  {otpState === 'verified' && (
+                    <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 bg-emerald-100/70 px-2 py-0.5 rounded-full border border-emerald-300">
+                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                      <span>Email Terverifikasi</span>
+                    </span>
+                  )}
                 </div>
+
+                <div className="flex gap-2">
+                  <div className="relative flex-1 min-w-0">
+                    <Mail className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                    <input
+                      type="email"
+                      required
+                      disabled={otpState === 'verified'}
+                      placeholder="Contoh: budi@gmail.com"
+                      value={regEmail}
+                      onChange={(e) => {
+                        setRegEmail(e.target.value);
+                        if (otpState !== 'idle') {
+                          setOtpState('idle');
+                          setOtpCode('');
+                          setOtpError(null);
+                          setOtpDebugHint(null);
+                        }
+                      }}
+                      className={`w-full pl-10 pr-3.5 py-2.5 rounded-xl text-sm focus:outline-hidden focus:ring-2 focus:ring-emerald-500 ${
+                        otpState === 'verified'
+                          ? 'bg-emerald-50/50 border border-emerald-300 text-slate-700'
+                          : 'bg-slate-50 border border-slate-200 focus:bg-white'
+                      }`}
+                    />
+                  </div>
+
+                  {/* Tombol Send Verification Code (Saat belum kirim kode) */}
+                  {otpState === 'idle' && (
+                    <button
+                      type="button"
+                      disabled={isSendingOtp}
+                      onClick={handleSendVerificationCode}
+                      className="px-3 py-2 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-bold text-xs rounded-xl transition-all shadow-xs shrink-0 whitespace-nowrap flex items-center gap-1.5 disabled:opacity-50"
+                    >
+                      <Send className="w-3.5 h-3.5" />
+                      <span>{isSendingOtp ? 'Sending...' : 'Send Verification Code'}</span>
+                    </button>
+                  )}
+                </div>
+
+                {/* AREA INPUT OTP & TOMBOL VERIFY OTP (Setelah Klik Send Code) */}
+                {otpState === 'sent' && (
+                  <div className="mt-2.5 p-3.5 bg-emerald-50/80 border border-emerald-300 rounded-2xl space-y-2.5 animate-in fade-in slide-in-from-top-2 duration-150">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="font-bold text-slate-800 flex items-center gap-1.5">
+                        <KeyRound className="w-3.5 h-3.5 text-emerald-600" />
+                        <span>Masukkan Kode OTP Email</span>
+                      </span>
+                      <span className="text-[11px] text-slate-500 font-mono">6 Digit</span>
+                    </div>
+
+                    <div className="flex gap-2">
+                      <div className="relative flex-1">
+                        <input
+                          type="text"
+                          maxLength={6}
+                          placeholder="Contoh: 849201"
+                          value={otpCode}
+                          onChange={(e) => {
+                            setOtpCode(e.target.value.replace(/[^0-9]/g, ''));
+                            setOtpError(null);
+                          }}
+                          className="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl text-sm font-mono tracking-widest text-center font-bold focus:outline-hidden focus:ring-2 focus:ring-emerald-500 shadow-2xs"
+                        />
+                      </div>
+
+                      {/* Tombol berubah menjadi "Verify OTP" */}
+                      <button
+                        type="button"
+                        disabled={isVerifyingOtp}
+                        onClick={handleVerifyOtp}
+                        className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-bold text-xs rounded-xl transition-all shadow-xs shrink-0 flex items-center gap-1.5 disabled:opacity-50"
+                      >
+                        <ShieldCheck className="w-3.5 h-3.5" />
+                        <span>{isVerifyingOtp ? 'Verifying...' : 'Verify OTP'}</span>
+                      </button>
+                    </div>
+
+                    {/* Hint Demo Code untuk kemudahan pengujian instan */}
+                    {otpDebugHint && (
+                      <div className="p-2 bg-amber-50 border border-amber-200 rounded-lg text-[11px] text-amber-800 flex items-center justify-between">
+                        <span className="flex items-center gap-1 font-medium">
+                          <Sparkles className="w-3.5 h-3.5 text-amber-600" />
+                          <span>Kode OTP Anda:</span>
+                        </span>
+                        <span className="font-mono font-bold text-sm tracking-wider bg-white px-2 py-0.5 rounded border border-amber-300 text-slate-900">
+                          {otpDebugHint}
+                        </span>
+                      </div>
+                    )}
+
+                    {/* Resend & Status text */}
+                    <div className="flex items-center justify-between text-[11px] pt-0.5">
+                      <span className="text-emerald-800">
+                        Kode dikirim ke <span className="font-semibold">{regEmail}</span>
+                      </span>
+                      <button
+                        type="button"
+                        disabled={otpCountdown > 0 || isSendingOtp}
+                        onClick={handleSendVerificationCode}
+                        className="text-emerald-700 hover:underline font-bold disabled:text-slate-400 disabled:no-underline"
+                      >
+                        {otpCountdown > 0 ? `Kirim Ulang (${otpCountdown}s)` : 'Kirim Ulang'}
+                      </button>
+                    </div>
+
+                    {otpError && (
+                      <p className="text-xs text-rose-600 font-semibold flex items-center gap-1">
+                        <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                        <span>{otpError}</span>
+                      </p>
+                    )}
+                  </div>
+                )}
               </div>
 
               {/* TOGGLE BUTTON: Use Password & Use PIN */}
