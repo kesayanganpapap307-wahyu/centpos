@@ -222,13 +222,50 @@ export const LoginView: React.FC<LoginViewProps> = ({ settings, onLogin }) => {
   const handleSendVerificationCode = async () => {
     setError(null);
     setOtpError(null);
+    const displayName = regDisplayName.trim();
     const email = regEmail.trim().toLowerCase();
+
+    if (!displayName) {
+      setError('Nama Tampilan (display_name) wajib diisi terlebih dahulu.');
+      return;
+    }
 
     if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
       setError('Masukkan alamat email yang valid terlebih dahulu.');
       return;
     }
 
+    // Validasi: Minimal salah satu (Password atau PIN) harus dipilih
+    if (!usePassword && !usePin) {
+      setError('Pilih minimal salah satu metode keamanan: Gunakan Password atau Gunakan PIN.');
+      return;
+    }
+
+    // Validasi Password jika dipilih
+    if (usePassword) {
+      if (!regPassword.trim()) {
+        setError('Kata Sandi wajib diisi karena toggle "Use Password" diaktifkan.');
+        return;
+      }
+      if (regPassword !== regConfirmPassword) {
+        setError('Konfirmasi Kata Sandi tidak cocok. Harap periksa kembali.');
+        return;
+      }
+    }
+
+    // Validasi PIN jika dipilih
+    if (usePin) {
+      if (!regPin.trim() || regPin.trim().length < 4) {
+        setError('PIN Kasir wajib diisi minimal 4 digit angka.');
+        return;
+      }
+      if (regPin !== regConfirmPin) {
+        setError('Konfirmasi PIN tidak cocok. Harap periksa kembali.');
+        return;
+      }
+    }
+
+    // Cek duplikasi email
     if (allUsers.some((u) => u.email?.toLowerCase() === email)) {
       setError(`Email "${email}" sudah terdaftar. Silakan gunakan email lain.`);
       return;
@@ -261,106 +298,14 @@ export const LoginView: React.FC<LoginViewProps> = ({ settings, onLogin }) => {
   };
 
   // ============================================================
-  // FUNGSI 2: VERIFY OTP
+  // FUNGSI 2: EKSEKUSI PENDAFTARAN KE DATABASE SUPABASE
   // ============================================================
-  const handleVerifyOtp = async () => {
-    setOtpError(null);
-    const code = otpCode.trim();
-    const email = regEmail.trim().toLowerCase();
-
-    if (!code || code.length !== 6) {
-      setOtpError('Masukkan 6 digit kode OTP verifikasi.');
-      return;
-    }
-
-    setIsVerifyingOtp(true);
-    try {
-      const res = await fetch('/api/auth/otp', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'verify', email, code }),
-      });
-
-      const data = await res.json();
-      if (res.ok && data.verified) {
-        setOtpState('verified');
-        setOtpError(null);
-        setOtpDebugHint(null);
-      } else {
-        setOtpError(data.error || 'Kode OTP salah atau telah kadaluarsa.');
-      }
-    } catch (err) {
-      console.error(err);
-      setOtpError('Gagal memverifikasi kode OTP.');
-    } finally {
-      setIsVerifyingOtp(false);
-    }
-  };
-
-  // Handle Registrasi Akun Baru (Sign Up) ke Supabase Table 'users'
-  const handleSignUpSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const executeRegister = async () => {
     setError(null);
     setIsLoading(true);
 
     const displayName = regDisplayName.trim();
     const email = regEmail.trim().toLowerCase();
-
-    if (!displayName || !email) {
-      setError('Nama Tampilan dan Alamat Email wajib diisi.');
-      setIsLoading(false);
-      return;
-    }
-
-    // WAJIB VERIFIKASI EMAIL
-    if (otpState !== 'verified') {
-      setError('Harap klik "Send Verification Code" dan verifikasi kode OTP email Anda terlebih dahulu.');
-      setIsLoading(false);
-      return;
-    }
-
-    // Validasi: Minimal salah satu (Password atau PIN) harus dipilih
-    if (!usePassword && !usePin) {
-      setError('Pilih minimal salah satu metode keamanan: Gunakan Password atau Gunakan PIN.');
-      setIsLoading(false);
-      return;
-    }
-
-    // Validasi Password jika dipilih
-    if (usePassword) {
-      if (!regPassword.trim()) {
-        setError('Kata Sandi wajib diisi karena toggle "Use Password" diaktifkan.');
-        setIsLoading(false);
-        return;
-      }
-      if (regPassword !== regConfirmPassword) {
-        setError('Konfirmasi Kata Sandi tidak cocok. Harap periksa kembali.');
-        setIsLoading(false);
-        return;
-      }
-    }
-
-    // Validasi PIN jika dipilih
-    if (usePin) {
-      if (!regPin.trim() || regPin.trim().length < 4) {
-        setError('PIN Kasir wajib diisi minimal 4 digit angka.');
-        setIsLoading(false);
-        return;
-      }
-      if (regPin !== regConfirmPin) {
-        setError('Konfirmasi PIN tidak cocok. Harap periksa kembali.');
-        setIsLoading(false);
-        return;
-      }
-    }
-
-    // Cek duplikasi email
-    if (allUsers.some((u) => u.email?.toLowerCase() === email)) {
-      setError(`Email "${email}" sudah terdaftar. Silakan gunakan email lain.`);
-      setIsLoading(false);
-      return;
-    }
-
     const finalPass = usePassword ? regPassword.trim() : '';
     const finalPin = usePin ? regPin.trim() : '';
 
@@ -423,10 +368,50 @@ export const LoginView: React.FC<LoginViewProps> = ({ settings, onLogin }) => {
     }
 
     setIsLoading(false);
-    setSuccess(`Akun "${displayName}" berhasil didaftarkan! Masuk sekarang...`);
+    setSuccess(`Akun "${displayName}" berhasil diverifikasi dan terdaftar! Mengalihkan ke sistem kasir...`);
     setTimeout(() => {
       onLogin(createdUser);
     }, 700);
+  };
+
+  // ============================================================
+  // FUNGSI 3: VERIFY OTP & LANGSUNG DAFTAR / MASUK
+  // ============================================================
+  const handleVerifyAndRegister = async () => {
+    setError(null);
+    setOtpError(null);
+    const code = otpCode.trim();
+    const email = regEmail.trim().toLowerCase();
+
+    if (!code || code.length !== 6) {
+      setOtpError('Masukkan 6 digit kode OTP verifikasi.');
+      return;
+    }
+
+    setIsVerifyingOtp(true);
+    try {
+      const res = await fetch('/api/auth/otp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'verify', email, code }),
+      });
+
+      const data = await res.json();
+      if (res.ok && data.verified) {
+        setOtpState('verified');
+        setOtpError(null);
+        setOtpDebugHint(null);
+        // Langsung selesaikan pendaftaran akun & login
+        await executeRegister();
+      } else {
+        setOtpError(data.error || 'Kode OTP salah atau telah kadaluarsa.');
+      }
+    } catch (err) {
+      console.error(err);
+      setOtpError('Gagal memverifikasi kode OTP.');
+    } finally {
+      setIsVerifyingOtp(false);
+    }
   };
 
   // Quick Login Preset
@@ -487,7 +472,17 @@ export const LoginView: React.FC<LoginViewProps> = ({ settings, onLogin }) => {
               </div>
             )}
 
-            <form onSubmit={handleSignUpSubmit} className="space-y-3.5 text-xs">
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                if (otpState === 'sent') {
+                  handleVerifyAndRegister();
+                } else {
+                  handleSendVerificationCode();
+                }
+              }}
+              className="space-y-3.5 text-xs"
+            >
               {/* Nama Tampilan */}
               <div>
                 <label className="block font-semibold text-slate-700 mb-1">
@@ -507,13 +502,18 @@ export const LoginView: React.FC<LoginViewProps> = ({ settings, onLogin }) => {
               </div>
 
               {/* ============================================================ */}
-              {/* ALAMAT EMAIL + TOMBOL SEND CODE / VERIFY OTP                 */}
+              {/* ALAMAT EMAIL                                                 */}
               {/* ============================================================ */}
               <div>
                 <div className="flex items-center justify-between mb-1">
                   <label className="font-semibold text-slate-700">
                     Alamat Email (email) *
                   </label>
+                  {otpState === 'sent' && (
+                    <span className="text-[11px] font-medium text-emerald-700">
+                      Menunggu Verifikasi OTP
+                    </span>
+                  )}
                   {otpState === 'verified' && (
                     <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 bg-emerald-100/70 px-2 py-0.5 rounded-full border border-emerald-300">
                       <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
@@ -522,120 +522,30 @@ export const LoginView: React.FC<LoginViewProps> = ({ settings, onLogin }) => {
                   )}
                 </div>
 
-                <div className="flex gap-2">
-                  <div className="relative flex-1 min-w-0">
-                    <Mail className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-                    <input
-                      type="email"
-                      required
-                      disabled={otpState === 'verified'}
-                      placeholder="Contoh: budi@gmail.com"
-                      value={regEmail}
-                      onChange={(e) => {
-                        setRegEmail(e.target.value);
-                        if (otpState !== 'idle') {
-                          setOtpState('idle');
-                          setOtpCode('');
-                          setOtpError(null);
-                          setOtpDebugHint(null);
-                        }
-                      }}
-                      className={`w-full pl-10 pr-3.5 py-2.5 rounded-xl text-sm focus:outline-hidden focus:ring-2 focus:ring-emerald-500 ${
-                        otpState === 'verified'
-                          ? 'bg-emerald-50/50 border border-emerald-300 text-slate-700'
-                          : 'bg-slate-50 border border-slate-200 focus:bg-white'
-                      }`}
-                    />
-                  </div>
-
-                  {/* Tombol Send Verification Code (Saat belum kirim kode) */}
-                  {otpState === 'idle' && (
-                    <button
-                      type="button"
-                      disabled={isSendingOtp}
-                      onClick={handleSendVerificationCode}
-                      className="px-3 py-2 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-bold text-xs rounded-xl transition-all shadow-xs shrink-0 whitespace-nowrap flex items-center gap-1.5 disabled:opacity-50"
-                    >
-                      <Send className="w-3.5 h-3.5" />
-                      <span>{isSendingOtp ? 'Sending...' : 'Send Verification Code'}</span>
-                    </button>
-                  )}
+                <div className="relative">
+                  <Mail className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="email"
+                    required
+                    disabled={otpState === 'verified'}
+                    placeholder="Contoh: budi@gmail.com"
+                    value={regEmail}
+                    onChange={(e) => {
+                      setRegEmail(e.target.value);
+                      if (otpState !== 'idle') {
+                        setOtpState('idle');
+                        setOtpCode('');
+                        setOtpError(null);
+                        setOtpDebugHint(null);
+                      }
+                    }}
+                    className={`w-full pl-10 pr-3.5 py-2.5 rounded-xl text-sm focus:outline-hidden focus:ring-2 focus:ring-emerald-500 ${
+                      otpState === 'verified'
+                        ? 'bg-emerald-50/50 border border-emerald-300 text-slate-700'
+                        : 'bg-slate-50 border border-slate-200 focus:bg-white'
+                    }`}
+                  />
                 </div>
-
-                {/* AREA INPUT OTP & TOMBOL VERIFY OTP (Setelah Klik Send Code) */}
-                {otpState === 'sent' && (
-                  <div className="mt-2.5 p-3.5 bg-emerald-50/80 border border-emerald-300 rounded-2xl space-y-2.5 animate-in fade-in slide-in-from-top-2 duration-150">
-                    <div className="flex items-center justify-between text-xs">
-                      <span className="font-bold text-slate-800 flex items-center gap-1.5">
-                        <KeyRound className="w-3.5 h-3.5 text-emerald-600" />
-                        <span>Masukkan Kode OTP Email</span>
-                      </span>
-                      <span className="text-[11px] text-slate-500 font-mono">6 Digit</span>
-                    </div>
-
-                    <div className="flex gap-2">
-                      <div className="relative flex-1">
-                        <input
-                          type="text"
-                          maxLength={6}
-                          placeholder="Contoh: 849201"
-                          value={otpCode}
-                          onChange={(e) => {
-                            setOtpCode(e.target.value.replace(/[^0-9]/g, ''));
-                            setOtpError(null);
-                          }}
-                          className="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl text-sm font-mono tracking-widest text-center font-bold focus:outline-hidden focus:ring-2 focus:ring-emerald-500 shadow-2xs"
-                        />
-                      </div>
-
-                      {/* Tombol berubah menjadi "Verify OTP" */}
-                      <button
-                        type="button"
-                        disabled={isVerifyingOtp}
-                        onClick={handleVerifyOtp}
-                        className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-bold text-xs rounded-xl transition-all shadow-xs shrink-0 flex items-center gap-1.5 disabled:opacity-50"
-                      >
-                        <ShieldCheck className="w-3.5 h-3.5" />
-                        <span>{isVerifyingOtp ? 'Verifying...' : 'Verify OTP'}</span>
-                      </button>
-                    </div>
-
-                    {/* Hint Demo Code untuk kemudahan pengujian instan */}
-                    {otpDebugHint && (
-                      <div className="p-2 bg-amber-50 border border-amber-200 rounded-lg text-[11px] text-amber-800 flex items-center justify-between">
-                        <span className="flex items-center gap-1 font-medium">
-                          <Sparkles className="w-3.5 h-3.5 text-amber-600" />
-                          <span>Kode OTP Anda:</span>
-                        </span>
-                        <span className="font-mono font-bold text-sm tracking-wider bg-white px-2 py-0.5 rounded border border-amber-300 text-slate-900">
-                          {otpDebugHint}
-                        </span>
-                      </div>
-                    )}
-
-                    {/* Resend & Status text */}
-                    <div className="flex items-center justify-between text-[11px] pt-0.5">
-                      <span className="text-emerald-800">
-                        Kode dikirim ke <span className="font-semibold">{regEmail}</span>
-                      </span>
-                      <button
-                        type="button"
-                        disabled={otpCountdown > 0 || isSendingOtp}
-                        onClick={handleSendVerificationCode}
-                        className="text-emerald-700 hover:underline font-bold disabled:text-slate-400 disabled:no-underline"
-                      >
-                        {otpCountdown > 0 ? `Kirim Ulang (${otpCountdown}s)` : 'Kirim Ulang'}
-                      </button>
-                    </div>
-
-                    {otpError && (
-                      <p className="text-xs text-rose-600 font-semibold flex items-center gap-1">
-                        <AlertCircle className="w-3.5 h-3.5 shrink-0" />
-                        <span>{otpError}</span>
-                      </p>
-                    )}
-                  </div>
-                )}
               </div>
 
               {/* TOGGLE BUTTON: Use Password & Use PIN */}
@@ -833,14 +743,99 @@ export const LoginView: React.FC<LoginViewProps> = ({ settings, onLogin }) => {
                 </div>
               </div>
 
-              <button
-                type="submit"
-                disabled={isLoading}
-                className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 active:scale-98 text-white rounded-xl text-sm font-bold shadow-md transition-all flex items-center justify-center gap-2 mt-4 disabled:opacity-50"
-              >
-                <span>{isLoading ? 'Menyimpan Akun...' : 'Daftar & Masuk Sekarang'}</span>
-                <ArrowRight className="w-4 h-4" />
-              </button>
+              {/* ============================================================ */}
+              {/* AREA INPUT OTP (Muncul saat kode verifikasi sudah terkirim)   */}
+              {/* ============================================================ */}
+              {otpState === 'sent' && (
+                <div className="p-3.5 bg-emerald-50/80 border border-emerald-300 rounded-2xl space-y-2.5 animate-in fade-in slide-in-from-bottom-2 duration-150 mt-3">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="font-bold text-slate-800 flex items-center gap-1.5">
+                      <KeyRound className="w-3.5 h-3.5 text-emerald-600" />
+                      <span>Masukkan Kode OTP Email</span>
+                    </span>
+                    <span className="text-[11px] text-slate-500 font-mono">6 Digit</span>
+                  </div>
+
+                  <div>
+                    <input
+                      type="text"
+                      maxLength={6}
+                      autoFocus
+                      placeholder="Contoh: 849201"
+                      value={otpCode}
+                      onChange={(e) => {
+                        setOtpCode(e.target.value.replace(/[^0-9]/g, ''));
+                        setOtpError(null);
+                      }}
+                      className="w-full px-3 py-2.5 bg-white border border-slate-300 rounded-xl text-base font-mono tracking-widest text-center font-bold focus:outline-hidden focus:ring-2 focus:ring-emerald-500 shadow-2xs"
+                    />
+                  </div>
+
+                  {/* Hint Demo Code untuk kemudahan pengujian instan */}
+                  {otpDebugHint && (
+                    <div className="p-2 bg-amber-50 border border-amber-200 rounded-lg text-[11px] text-amber-800 flex items-center justify-between">
+                      <span className="flex items-center gap-1 font-medium">
+                        <Sparkles className="w-3.5 h-3.5 text-amber-600" />
+                        <span>Kode OTP Anda:</span>
+                      </span>
+                      <span className="font-mono font-bold text-sm tracking-wider bg-white px-2 py-0.5 rounded border border-amber-300 text-slate-900">
+                        {otpDebugHint}
+                      </span>
+                    </div>
+                  )}
+
+                  {/* Resend & Status text */}
+                  <div className="flex items-center justify-between text-[11px] pt-0.5">
+                    <span className="text-emerald-800 truncate mr-2">
+                      Kode dikirim ke <span className="font-semibold">{regEmail}</span>
+                    </span>
+                    <button
+                      type="button"
+                      disabled={otpCountdown > 0 || isSendingOtp}
+                      onClick={handleSendVerificationCode}
+                      className="text-emerald-700 hover:underline font-bold disabled:text-slate-400 disabled:no-underline shrink-0"
+                    >
+                      {otpCountdown > 0 ? `Kirim Ulang (${otpCountdown}s)` : 'Kirim Ulang'}
+                    </button>
+                  </div>
+
+                  {otpError && (
+                    <p className="text-xs text-rose-600 font-semibold flex items-center gap-1">
+                      <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                      <span>{otpError}</span>
+                    </p>
+                  )}
+                </div>
+              )}
+
+              {/* ============================================================ */}
+              {/* TOMBOL UTAMA: MENGGANTIKAN TOMBOL DAFTAR & MASUK SEKARANG    */}
+              {/* ============================================================ */}
+              {otpState !== 'sent' ? (
+                <button
+                  type="submit"
+                  disabled={isSendingOtp}
+                  className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 active:scale-98 text-white rounded-xl text-sm font-bold shadow-md transition-all flex items-center justify-center gap-2 mt-4 disabled:opacity-50"
+                >
+                  <Send className="w-4 h-4" />
+                  <span>{isSendingOtp ? 'Mengirim Kode...' : 'Send Verification Code'}</span>
+                </button>
+              ) : (
+                <button
+                  type="submit"
+                  disabled={isVerifyingOtp || isLoading}
+                  className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 active:scale-98 text-white rounded-xl text-sm font-bold shadow-md transition-all flex items-center justify-center gap-2 mt-3 disabled:opacity-50"
+                >
+                  <ShieldCheck className="w-4 h-4" />
+                  <span>
+                    {isVerifyingOtp
+                      ? 'Memverifikasi Kode OTP...'
+                      : isLoading
+                      ? 'Menyimpan & Masuk...'
+                      : 'Verify OTP'}
+                  </span>
+                </button>
+              )}
             </form>
 
             {/* Back to Sign In button */}
