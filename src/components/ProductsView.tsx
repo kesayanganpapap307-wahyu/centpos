@@ -10,16 +10,20 @@ import {
   Package, 
   Barcode,
   LayoutGrid,
-  List
+  List,
+  Lock
 } from 'lucide-react';
-import { Product, Category } from '../types/pos';
+import { Product, Category, StoreSettings } from '../types/pos';
 import { formatCurrency } from '../utils/format';
+import { UpgradeModal } from './UpgradeModal';
 
 interface ProductsViewProps {
   products: Product[];
   onAddProduct: (product: Product) => void;
   onUpdateProduct: (product: Product) => void;
   onDeleteProduct: (id: string) => void;
+  settings?: StoreSettings;
+  onSaveSettings?: (settings: StoreSettings) => void;
 }
 
 export const ProductsView: React.FC<ProductsViewProps> = ({
@@ -27,10 +31,13 @@ export const ProductsView: React.FC<ProductsViewProps> = ({
   onAddProduct,
   onUpdateProduct,
   onDeleteProduct,
+  settings,
+  onSaveSettings,
 }) => {
   const [search, setSearch] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<Category>('Semua');
   const [viewMode, setViewMode] = useState<'grid' | 'table'>('grid');
+  const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState(false);
 
   // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -536,42 +543,72 @@ export const ProductsView: React.FC<ProductsViewProps> = ({
               </div>
 
               {/* Tingkatan Harga Jual (Agen / Member) */}
-              <div className="p-3.5 bg-slate-50/90 border border-slate-200 rounded-2xl space-y-2">
-                <span className="block font-bold text-slate-800 text-xs">
-                  Tingkatan Harga Khusus (Opsional):
-                </span>
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block font-semibold text-slate-700 mb-1 text-[11px]">
-                      🏢 Harga Agen / Reseller (Rp)
-                    </label>
-                    <input
-                      type="number"
-                      min={0}
-                      placeholder="Contoh: 15000"
-                      value={agentPrice ?? ''}
-                      onChange={(e) => setAgentPrice(e.target.value ? Number(e.target.value) : undefined)}
-                      className="w-full px-3 py-2 border border-slate-300 rounded-xl text-sm font-bold text-blue-700 bg-white focus:ring-2 focus:ring-blue-500 focus:outline-hidden"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block font-semibold text-slate-700 mb-1 text-[11px]">
-                      ⭐ Harga Member / VIP (Rp)
-                    </label>
-                    <input
-                      type="number"
-                      min={0}
-                      placeholder="Contoh: 16500"
-                      value={memberPrice ?? ''}
-                      onChange={(e) => setMemberPrice(e.target.value ? Number(e.target.value) : undefined)}
-                      className="w-full px-3 py-2 border border-slate-300 rounded-xl text-sm font-bold text-purple-700 bg-white focus:ring-2 focus:ring-purple-500 focus:outline-hidden"
-                    />
-                  </div>
+              <div className="p-3.5 bg-slate-50/90 border border-slate-200 rounded-2xl space-y-2 relative overflow-hidden">
+                <div className="flex items-center justify-between">
+                  <span className="block font-bold text-slate-800 text-xs">
+                    Tingkatan Harga Khusus (Opsional):
+                  </span>
+                  {!settings?.enableMultiTierPricing && (
+                    <button
+                      type="button"
+                      onClick={() => setIsUpgradeModalOpen(true)}
+                      className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-900 border border-amber-300 hover:bg-amber-200 transition-colors shadow-2xs"
+                    >
+                      <Lock className="w-2.5 h-2.5 text-amber-700" />
+                      <span>Modul Terkunci (Buka PRO)</span>
+                    </button>
+                  )}
                 </div>
-                <p className="text-[10px] text-slate-400 leading-tight">
-                  * Biarkan kosong jika produk ini ingin tetap menggunakan harga customer umum.
-                </p>
+
+                {!settings?.enableMultiTierPricing ? (
+                  <div className="p-3 bg-amber-50/80 border border-amber-200 rounded-xl text-center space-y-2">
+                    <p className="text-[11px] text-amber-900 font-medium">
+                      🔒 Penetapan harga khusus <b>Agen &amp; Member</b> memerlukan <b>Modul Multi-Tier Pricing</b>.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => setIsUpgradeModalOpen(true)}
+                      className="px-3.5 py-1.5 bg-amber-500 hover:bg-amber-600 active:scale-95 text-white font-bold text-xs rounded-xl transition-all shadow-xs"
+                    >
+                      Beli / Buka Kunci Modul (Rp 99.000)
+                    </button>
+                  </div>
+                ) : (
+                  <>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="block font-semibold text-slate-700 mb-1 text-[11px]">
+                          🏢 Harga Agen / Reseller (Rp)
+                        </label>
+                        <input
+                          type="number"
+                          min={0}
+                          placeholder="Contoh: 15000"
+                          value={agentPrice ?? ''}
+                          onChange={(e) => setAgentPrice(e.target.value ? Number(e.target.value) : undefined)}
+                          className="w-full px-3 py-2 border border-slate-300 rounded-xl text-sm font-bold text-blue-700 bg-white focus:ring-2 focus:ring-blue-500 focus:outline-hidden"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block font-semibold text-slate-700 mb-1 text-[11px]">
+                          ⭐ Harga Member / VIP (Rp)
+                        </label>
+                        <input
+                          type="number"
+                          min={0}
+                          placeholder="Contoh: 16500"
+                          value={memberPrice ?? ''}
+                          onChange={(e) => setMemberPrice(e.target.value ? Number(e.target.value) : undefined)}
+                          className="w-full px-3 py-2 border border-slate-300 rounded-xl text-sm font-bold text-purple-700 bg-white focus:ring-2 focus:ring-purple-500 focus:outline-hidden"
+                        />
+                      </div>
+                    </div>
+                    <p className="text-[10px] text-slate-400 leading-tight">
+                      * Biarkan kosong jika produk ini ingin tetap menggunakan harga customer umum.
+                    </p>
+                  </>
+                )}
               </div>
 
               <div>
@@ -604,6 +641,18 @@ export const ProductsView: React.FC<ProductsViewProps> = ({
           </div>
         </div>
       )}
+
+      {/* Upgrade / Paywall Modal Modul Multi-Tier Pricing */}
+      <UpgradeModal
+        isOpen={isUpgradeModalOpen}
+        onClose={() => setIsUpgradeModalOpen(false)}
+        onUnlock={() => {
+          if (settings && onSaveSettings) {
+            onSaveSettings({ ...settings, enableMultiTierPricing: true });
+          }
+        }}
+        storeName={settings?.storeName}
+      />
     </div>
   );
 };

@@ -465,6 +465,8 @@ CREATE POLICY "Allow all for transaction_items" ON transaction_items FOR ALL TO 
               onAddProduct={handleAddProduct}
               onUpdateProduct={handleUpdateProduct}
               onDeleteProduct={handleDeleteProduct}
+              settings={settings}
+              onSaveSettings={saveSettingsLocally}
             />
           )}
 

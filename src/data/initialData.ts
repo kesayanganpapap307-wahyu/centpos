@@ -10,6 +10,7 @@ export const initialStoreSettings: StoreSettings = {
   receiptFooter: 'Terima Kasih Telah Berbelanja!\nBarang yang sudah dibeli tidak dapat ditukar.',
   currency: 'Rp',
   paperSize: '58mm',
+  enableMultiTierPricing: false, // Default: Terkunci (Perlu pembelian modul)
 };
 
 export const initialProducts: Product[] = [

@@ -62,6 +62,7 @@ export interface StoreSettings {
   currency: string;
   paperSize: '58mm' | '80mm';
   qrisImage?: string; // Data URL or URL of uploaded QRIS
+  enableMultiTierPricing?: boolean; // Modul berbayar: Multi-tier harga agen & member
 }
 
 export interface AuthUser {

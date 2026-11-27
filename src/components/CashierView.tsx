@@ -16,10 +16,12 @@ import {
   RotateCcw,
   Sparkles,
   Barcode,
-  Upload
+  Upload,
+  Lock
 } from 'lucide-react';
 import { Product, CartItem, Category, StoreSettings, Transaction, PaymentMethod, CustomerTier } from '../types/pos';
 import { formatCurrency, generateInvoiceNumber } from '../utils/format';
+import { UpgradeModal } from './UpgradeModal';
 
 interface CashierViewProps {
   products: Product[];
@@ -46,6 +48,7 @@ export const CashierView: React.FC<CashierViewProps> = ({
   const [customerName, setCustomerName] = useState<string>('Pelanggan Umum');
   const [discountPercent, setDiscountPercent] = useState<number>(0);
   const [isCheckoutModalOpen, setIsCheckoutModalOpen] = useState<boolean>(false);
+  const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState<boolean>(false);
 
   // Helper untuk mendapatkan harga jual berdasarkan tier harga (Customer, Agen, Member)
   const getProductPriceForTier = (product: Product, tier: CustomerTier = selectedTier) => {
@@ -59,6 +62,12 @@ export const CashierView: React.FC<CashierViewProps> = ({
   };
 
   const handleTierChange = (newTier: CustomerTier) => {
+    // Kunci harga Agen & Member jika modul multi-tier belum dibeli/diaktifkan
+    if (newTier !== 'customer' && !settings.enableMultiTierPricing) {
+      setIsUpgradeModalOpen(true);
+      return;
+    }
+
     setSelectedTier(newTier);
     setCart((prevCart) =>
       prevCart.map((item) => ({
@@ -421,15 +430,26 @@ export const CashierView: React.FC<CashierViewProps> = ({
         <div className="px-4 py-2 bg-slate-50/80 border-b border-slate-200">
           <div className="flex items-center justify-between mb-1.5 text-[11px] font-bold text-slate-700">
             <span>Tipe Harga Jual:</span>
-            <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
-              selectedTier === 'agen'
-                ? 'bg-blue-100 text-blue-800'
-                : selectedTier === 'member'
-                ? 'bg-purple-100 text-purple-800'
-                : 'bg-emerald-100 text-emerald-800'
-            }`}>
-              {selectedTier === 'agen' ? '🏢 Harga Agen' : selectedTier === 'member' ? '⭐ Harga Member' : '👤 Customer Umum'}
-            </span>
+            {!settings.enableMultiTierPricing ? (
+              <button
+                type="button"
+                onClick={() => setIsUpgradeModalOpen(true)}
+                className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-900 border border-amber-300 hover:bg-amber-200 transition-colors shadow-2xs"
+              >
+                <Lock className="w-2.5 h-2.5 text-amber-700" />
+                <span>Buka Kunci Modul</span>
+              </button>
+            ) : (
+              <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
+                selectedTier === 'agen'
+                  ? 'bg-blue-100 text-blue-800'
+                  : selectedTier === 'member'
+                  ? 'bg-purple-100 text-purple-800'
+                  : 'bg-emerald-100 text-emerald-800'
+              }`}>
+                {selectedTier === 'agen' ? '🏢 Harga Agen' : selectedTier === 'member' ? '⭐ Harga Member' : '👤 Customer Umum'}
+              </span>
+            )}
           </div>
           <div className="grid grid-cols-3 gap-1 text-[11px] font-bold">
             <button
@@ -446,24 +466,30 @@ export const CashierView: React.FC<CashierViewProps> = ({
             <button
               type="button"
               onClick={() => handleTierChange('agen')}
-              className={`py-1.5 px-1.5 rounded-lg border text-center transition-all ${
+              className={`py-1.5 px-1.5 rounded-lg border text-center transition-all flex items-center justify-center gap-1 ${
                 selectedTier === 'agen'
                   ? 'bg-blue-600 text-white border-blue-600 shadow-2xs'
+                  : !settings.enableMultiTierPricing
+                  ? 'bg-slate-50 text-slate-400 border-dashed border-slate-300 hover:bg-amber-50 hover:text-amber-800 hover:border-amber-300'
                   : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-100'
               }`}
             >
-              🏢 Agen
+              {!settings.enableMultiTierPricing && <Lock className="w-3 h-3 text-amber-500 shrink-0" />}
+              <span>🏢 Agen</span>
             </button>
             <button
               type="button"
               onClick={() => handleTierChange('member')}
-              className={`py-1.5 px-1.5 rounded-lg border text-center transition-all ${
+              className={`py-1.5 px-1.5 rounded-lg border text-center transition-all flex items-center justify-center gap-1 ${
                 selectedTier === 'member'
                   ? 'bg-purple-600 text-white border-purple-600 shadow-2xs'
+                  : !settings.enableMultiTierPricing
+                  ? 'bg-slate-50 text-slate-400 border-dashed border-slate-300 hover:bg-amber-50 hover:text-amber-800 hover:border-amber-300'
                   : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-100'
               }`}
             >
-              ⭐ Member
+              {!settings.enableMultiTierPricing && <Lock className="w-3 h-3 text-amber-500 shrink-0" />}
+              <span>⭐ Member</span>
             </button>
           </div>
         </div>
@@ -847,6 +873,18 @@ export const CashierView: React.FC<CashierViewProps> = ({
           </div>
         </div>
       )}
+
+      {/* Upgrade / Paywall Modal Modul Multi-Tier Pricing */}
+      <UpgradeModal
+        isOpen={isUpgradeModalOpen}
+        onClose={() => setIsUpgradeModalOpen(false)}
+        onUnlock={() => {
+          if (onSaveSettings) {
+            onSaveSettings({ ...settings, enableMultiTierPricing: true });
+          }
+        }}
+        storeName={settings.storeName}
+      />
     </div>
   );
 };

@@ -12,7 +12,10 @@ import {
   Receipt,
   QrCode,
   Upload,
-  Trash2
+  Trash2,
+  Lock,
+  Crown,
+  Sparkles
 } from 'lucide-react';
 import { StoreSettings } from '../types/pos';
 
@@ -277,6 +280,67 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                 <p className="text-[11px] text-slate-500">
                   Format yang didukung: <b>PNG, JPG, WebP</b> (Maksimal 3 MB). Pastikan barcode QRIS terlihat tajam dan jelas agar kamera pelanggan mudah membaca kode.
                 </p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Manajemen Modul & Lisensi Add-on */}
+        <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-xs space-y-4">
+          <div className="flex items-center gap-2 border-b border-slate-100 pb-3">
+            <Crown className="w-5 h-5 text-indigo-600" />
+            <h3 className="font-bold text-sm text-slate-900">Manajemen Modul &amp; Lisensi Add-On</h3>
+          </div>
+
+          <div className="space-y-3 text-xs">
+            <div className="p-4 bg-gradient-to-r from-slate-50 to-indigo-50/40 border border-slate-200 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <span className="font-bold text-slate-900 text-sm">Modul Multi-Tier Pricing</span>
+                  {formData.enableMultiTierPricing ? (
+                    <span className="inline-flex items-center gap-1 bg-emerald-100 text-emerald-800 text-[10px] font-bold px-2 py-0.5 rounded-full border border-emerald-300">
+                      <Check className="w-3 h-3 stroke-[3]" />
+                      <span>AKTIF (Lisensi Terpasang)</span>
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1 bg-amber-100 text-amber-900 text-[10px] font-bold px-2 py-0.5 rounded-full border border-amber-300">
+                      <Lock className="w-3 h-3" />
+                      <span>TERKUNCI (Belum Dibeli)</span>
+                    </span>
+                  )}
+                </div>
+                <p className="text-slate-500 text-[11px] max-w-lg">
+                  Memungkinkan penetapan tingkatan harga jual berbeda untuk <b>Harga Agen/Reseller</b> dan <b>Harga Member</b> di kasir dan data produk.
+                </p>
+              </div>
+
+              <div className="shrink-0 flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() =>
+                    setFormData((prev) => ({
+                      ...prev,
+                      enableMultiTierPricing: !prev.enableMultiTierPricing,
+                    }))
+                  }
+                  className={`px-4 py-2 rounded-xl text-xs font-bold transition-all shadow-xs flex items-center gap-1.5 ${
+                    formData.enableMultiTierPricing
+                      ? 'bg-rose-50 text-rose-700 hover:bg-rose-100 border border-rose-200'
+                      : 'bg-indigo-600 text-white hover:bg-indigo-700 active:scale-95'
+                  }`}
+                >
+                  {formData.enableMultiTierPricing ? (
+                    <>
+                      <Lock className="w-3.5 h-3.5" />
+                      <span>Kunci Kembali (Uji Coba Kunci)</span>
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="w-3.5 h-3.5 text-amber-300" />
+                      <span>Aktifkan Lisensi Modul</span>
+                    </>
+                  )}
+                </button>
               </div>
             </div>
           </div>
