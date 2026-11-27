@@ -522,7 +522,7 @@ CREATE POLICY "Allow all for transaction_items" ON transaction_items FOR ALL TO 
   }
 
   return (
-    <div className="min-h-screen flex flex-col md:flex-row bg-slate-100">
+    <div className="min-h-screen flex flex-col md:flex-row bg-slate-100 w-full max-w-full overflow-x-hidden">
       {/* Left Sidebar (Desktop Fixed + Mobile Slide-out Drawer) */}
       <Sidebar
         activeTab={activeTab}
@@ -539,17 +539,17 @@ CREATE POLICY "Allow all for transaction_items" ON transaction_items FOR ALL TO 
       />
 
       {/* Main Content Area */}
-      <div className="flex-1 flex flex-col min-w-0">
+      <div className="flex-1 flex flex-col min-w-0 w-full max-w-full overflow-x-hidden">
         {/* Offline Alert / Sync Notice Banner */}
         {syncNotice && (
           <div className="bg-emerald-600 text-white px-4 py-2.5 text-xs font-semibold flex items-center justify-between shadow-sm animate-fadeIn">
-            <div className="flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-white animate-ping" />
-              <span>{syncNotice}</span>
+            <div className="flex items-center gap-2 min-w-0">
+              <span className="w-2 h-2 rounded-full bg-white animate-ping shrink-0" />
+              <span className="truncate">{syncNotice}</span>
             </div>
             <button
               onClick={() => setSyncNotice(null)}
-              className="px-2 py-0.5 text-emerald-100 hover:text-white hover:bg-emerald-700 rounded-md transition-colors text-xs"
+              className="px-2 py-0.5 text-emerald-100 hover:text-white hover:bg-emerald-700 rounded-md transition-colors text-xs shrink-0 ml-2"
             >
               ✕
             </button>
@@ -558,15 +558,15 @@ CREATE POLICY "Allow all for transaction_items" ON transaction_items FOR ALL TO 
 
         {/* Offline Mode Indicator Banner (Ketika Benar-Benar Putus Internet) */}
         {!isOnline && (
-          <div className="bg-amber-500 text-slate-950 px-4 py-2.5 text-xs font-bold flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 border-b border-amber-600 shadow-sm">
-            <div className="flex items-center gap-2">
+          <div className="bg-amber-500 text-slate-950 px-4 py-2 text-xs font-bold flex flex-col sm:flex-row items-start sm:items-center justify-between gap-1.5 border-b border-amber-600 shadow-sm">
+            <div className="flex items-center gap-2 min-w-0">
               <WifiOff className="w-4 h-4 shrink-0 text-slate-950" />
-              <span>
-                Mode Offline Aktif: Internet tidak terhubung. Kasir tetap bisa jualan normal! Seluruh transaksi disimpan aman di perangkat ({pendingSyncCount} antrean).
+              <span className="leading-tight">
+                Mode Offline: Transaksi kasir tetap tersimpan aman di HP ({pendingSyncCount} antrean).
               </span>
             </div>
-            <span className="px-2.5 py-1 bg-slate-900 text-white rounded-lg text-[11px] font-mono shrink-0">
-              Otomatis sinkron saat online
+            <span className="px-2 py-0.5 bg-slate-900 text-white rounded text-[10px] font-mono shrink-0">
+              Auto-sync saat online
             </span>
           </div>
         )}
@@ -575,11 +575,11 @@ CREATE POLICY "Allow all for transaction_items" ON transaction_items FOR ALL TO 
         {cloudStatus === 'error' && (
           <div className="bg-amber-500 text-slate-950 px-4 py-3 border-b border-amber-600 shadow-sm">
             <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs">
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 min-w-0">
                 <AlertTriangle className="w-4 h-4 shrink-0 text-slate-950" />
-                <div>
-                  <span className="font-bold">Izin Database Supabase Diperlukan (Permission Denied):</span>{' '}
-                  <span>Supabase menolak akses tulis karena tabel belum diberi hak akses GRANT.</span>
+                <div className="min-w-0">
+                  <span className="font-bold">Izin Database Supabase Diperlukan:</span>{' '}
+                  <span className="break-words">Supabase menolak akses tulis karena tabel belum diberi hak akses GRANT.</span>
                 </div>
               </div>
 
@@ -604,7 +604,7 @@ CREATE POLICY "Allow all for transaction_items" ON transaction_items FOR ALL TO 
         )}
 
         {/* Main Views */}
-        <main className="flex-1 flex flex-col min-w-0">
+        <main className="flex-1 flex flex-col min-w-0 w-full max-w-full overflow-x-hidden">
           {activeTab === 'pos' && (
             <CashierView
               products={products}

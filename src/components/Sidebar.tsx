@@ -110,63 +110,63 @@ export const Sidebar: React.FC<SidebarProps> = ({
       {/* ============================================================ */}
       {/* 1. MOBILE TOP HEADER (Hanya Tampil di Layar Kecil / HP)       */}
       {/* ============================================================ */}
-      <header className="md:hidden sticky top-0 z-30 bg-white border-b border-slate-200 px-4 h-14 flex items-center justify-between shadow-xs">
-        <div className="flex items-center gap-2.5">
+      <header className="md:hidden sticky top-0 z-30 bg-white border-b border-slate-200 px-3 h-14 flex items-center justify-between shadow-xs w-full max-w-full overflow-hidden">
+        <div className="flex items-center gap-2 min-w-0 flex-1 mr-2">
           <button
             onClick={() => setIsOpen(true)}
-            className="p-2 -ml-1 text-slate-700 hover:text-emerald-700 hover:bg-slate-100 rounded-xl transition-colors active:scale-95"
+            className="p-1.5 -ml-1 text-slate-700 hover:text-emerald-700 hover:bg-slate-100 rounded-xl transition-colors active:scale-95 shrink-0"
             aria-label="Buka Navigasi"
           >
-            <Menu className="w-6 h-6" />
+            <Menu className="w-5 h-5" />
           </button>
 
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-emerald-600 to-teal-500 flex items-center justify-center text-white font-bold text-sm shadow-xs">
+          <div className="flex items-center gap-2 min-w-0">
+            <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-emerald-600 to-teal-500 flex items-center justify-center text-white font-bold text-xs shadow-xs shrink-0">
               CP
             </div>
-            <div className="leading-tight">
-              <h1 className="text-sm font-bold text-slate-900 truncate max-w-[140px] xs:max-w-[180px]">
+            <div className="leading-tight min-w-0">
+              <h1 className="text-xs sm:text-sm font-bold text-slate-900 truncate">
                 {settings.storeName}
               </h1>
-              <p className="text-[10px] text-slate-500">CentPOS Cloud</p>
+              <p className="text-[10px] text-slate-500 truncate">CentPOS Cloud</p>
             </div>
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5 shrink-0">
           {/* Status Badge Mobile */}
           {!isOnline ? (
-            <span className="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full border bg-amber-50 text-amber-800 border-amber-300">
-              <WifiOff className="w-3 h-3 text-amber-600" />
+            <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full border bg-amber-50 text-amber-800 border-amber-300">
+              <WifiOff className="w-2.5 h-2.5 text-amber-600" />
               <span>Offline {pendingSyncCount > 0 ? `(${pendingSyncCount})` : ''}</span>
             </span>
           ) : isSyncing ? (
-            <span className="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full border bg-blue-50 text-blue-700 border-blue-200">
-              <RefreshCw className="w-3 h-3 text-blue-600 animate-spin" />
+            <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full border bg-blue-50 text-blue-700 border-blue-200">
+              <RefreshCw className="w-2.5 h-2.5 text-blue-600 animate-spin" />
               <span>Sinkron...</span>
             </span>
           ) : pendingSyncCount > 0 ? (
             <button
               onClick={onManualSync}
-              className="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full border bg-amber-500 text-white border-amber-600 hover:bg-amber-600 transition-colors shadow-2xs"
+              className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full border bg-amber-500 text-white border-amber-600 hover:bg-amber-600 transition-colors shadow-2xs"
             >
-              <RefreshCw className="w-3 h-3" />
+              <RefreshCw className="w-2.5 h-2.5" />
               <span>Sinkron ({pendingSyncCount})</span>
             </button>
           ) : (
             <span
-              className={`inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full border ${
+              className={`inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full border ${
                 cloudStatus === 'error'
                   ? 'bg-rose-50 text-rose-700 border-rose-200'
                   : 'bg-emerald-50 text-emerald-700 border-emerald-200'
               }`}
             >
-              <Wifi className="w-3 h-3 text-emerald-500 animate-pulse" />
+              <Wifi className="w-2.5 h-2.5 text-emerald-500 animate-pulse" />
               <span>Online</span>
             </span>
           )}
 
-          <span className="font-mono text-xs text-slate-600 bg-slate-100 px-2 py-1 rounded-md">
+          <span className="font-mono text-[11px] text-slate-600 bg-slate-100 px-1.5 py-0.5 rounded-md hidden xs:inline">
             {time.slice(0, 5)}
           </span>
         </div>
