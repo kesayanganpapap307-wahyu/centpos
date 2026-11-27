@@ -61,11 +61,24 @@ CREATE TABLE IF NOT EXISTS store_settings (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
+-- 5. Tabel Pengguna & Kasir (Users Authentication)
+CREATE TABLE IF NOT EXISTS users (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    display_name VARCHAR(255) NOT NULL,
+    email VARCHAR(255) UNIQUE NOT NULL,
+    password VARCHAR(255) NOT NULL,
+    pin VARCHAR(10) NOT NULL,
+    role VARCHAR(50) NOT NULL DEFAULT 'cashier',
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
 -- Indexing untuk pencarian cepat
 CREATE INDEX IF NOT EXISTS idx_products_barcode ON products(barcode);
 CREATE INDEX IF NOT EXISTS idx_products_category ON products(category);
 CREATE INDEX IF NOT EXISTS idx_transactions_invoice ON transactions(invoice_number);
 CREATE INDEX IF NOT EXISTS idx_transactions_created_at ON transactions(created_at);
+CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
+CREATE INDEX IF NOT EXISTS idx_users_pin ON users(pin);
 
 -- ============================================================
 -- HAK AKSES (PERMISSIONS) & ROW LEVEL SECURITY (RLS)
@@ -95,3 +108,7 @@ CREATE POLICY "Allow all for transaction_items" ON transaction_items FOR ALL TO 
 ALTER TABLE store_settings ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Allow all for store_settings" ON store_settings;
 CREATE POLICY "Allow all for store_settings" ON store_settings FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
+
+ALTER TABLE users ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Allow all for users" ON users;
+CREATE POLICY "Allow all for users" ON users FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);

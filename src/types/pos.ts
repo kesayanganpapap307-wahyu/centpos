@@ -58,8 +58,11 @@ export interface StoreSettings {
 
 export interface AuthUser {
   id: string;
-  name: string;
-  username: string;
+  display_name: string;
+  name?: string;
+  email: string;
+  username?: string;
   role: 'owner' | 'cashier';
   pin?: string;
+  password?: string;
 }

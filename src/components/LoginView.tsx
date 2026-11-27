@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { 
   Lock, 
-  User, 
+  Mail,
   KeyRound, 
   ShieldCheck, 
   Delete, 
@@ -11,7 +11,8 @@ import {
   AlertCircle,
   Store,
   UserPlus,
-  CheckCircle2
+  CheckCircle2,
+  User
 } from 'lucide-react';
 import { AuthUser, StoreSettings } from '../types/pos';
 
@@ -24,16 +25,18 @@ interface LoginViewProps {
 export const DEFAULT_USERS: (AuthUser & { password?: string })[] = [
   {
     id: 'user-owner',
+    display_name: 'Wahyu (Owner)',
     name: 'Wahyu (Owner)',
-    username: 'admin',
+    email: 'admin@centpos.com',
     role: 'owner',
     pin: '1234',
     password: 'admin',
   },
   {
     id: 'user-cashier-1',
+    display_name: 'Kasir Utama',
     name: 'Kasir Utama',
-    username: 'kasir',
+    email: 'kasir@centpos.com',
     role: 'cashier',
     pin: '0000',
     password: 'kasir',
@@ -50,36 +53,66 @@ export const LoginView: React.FC<LoginViewProps> = ({ settings, onLogin }) => {
   // State Sign In PIN
   const [pin, setPin] = useState('');
   
-  // State Sign In Password
-  const [username, setUsername] = useState('');
+  // State Sign In Email/Password
+  const [emailOrUser, setEmailOrUser] = useState('');
   const [password, setPassword] = useState('');
   
-  // State Sign Up Form
-  const [regName, setRegName] = useState('');
-  const [regUsername, setRegUsername] = useState('');
+  // State Sign Up Form sesuai tabel users Supabase:
+  // display_name, email, password, pin, role
+  const [regDisplayName, setRegDisplayName] = useState('');
+  const [regEmail, setRegEmail] = useState('');
+  const [regPassword, setRegPassword] = useState('');
   const [regPin, setRegPin] = useState('');
   const [regRole, setRegRole] = useState<'owner' | 'cashier'>('cashier');
   
-  // List user terdaftar (termasuk dari localStorage)
+  // List user terdaftar (Supabase Cloud + LocalStorage + Default)
   const [allUsers, setAllUsers] = useState<(AuthUser & { password?: string })[]>(DEFAULT_USERS);
 
   // Status pesan
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
 
-  // Load custom users from localStorage
+  // 1. Fetch users from Supabase Cloud on mount
   useEffect(() => {
-    try {
-      const saved = localStorage.getItem('centpos_registered_users');
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed)) {
-          setAllUsers([...DEFAULT_USERS, ...parsed]);
+    const fetchCloudUsers = async () => {
+      try {
+        const res = await fetch('/api/users');
+        if (res.ok) {
+          const cloudUsers: any[] = await res.json();
+          if (Array.isArray(cloudUsers) && cloudUsers.length > 0) {
+            const mapped = cloudUsers.map((u) => ({
+              id: u.id,
+              display_name: u.display_name,
+              name: u.display_name,
+              email: u.email,
+              role: u.role || 'cashier',
+              pin: u.pin,
+              password: u.password,
+            }));
+            setAllUsers([...DEFAULT_USERS, ...mapped]);
+            return;
+          }
         }
+      } catch (err) {
+        console.warn('Could not fetch cloud users:', err);
       }
-    } catch (e) {
-      console.error(e);
-    }
+
+      // Fallback: load from localStorage
+      try {
+        const saved = localStorage.getItem('centpos_registered_users');
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed)) {
+            setAllUsers([...DEFAULT_USERS, ...parsed]);
+          }
+        }
+      } catch (e) {
+        console.error(e);
+      }
+    };
+
+    fetchCloudUsers();
   }, []);
 
   // Handle Numpad input (PIN Sign In)
@@ -108,76 +141,138 @@ export const LoginView: React.FC<LoginViewProps> = ({ settings, onLogin }) => {
   const verifyPin = (pinToTest: string) => {
     const matched = allUsers.find((u) => u.pin === pinToTest);
     if (matched) {
-      onLogin(matched);
+      onLogin({
+        ...matched,
+        name: matched.display_name || matched.name || 'Kasir',
+      });
     } else {
       setError('PIN tidak valid. Coba PIN: 1234 (Owner) atau 0000 (Kasir)');
       setTimeout(() => setPin(''), 600);
     }
   };
 
-  // Verifikasi Username/Password Sign In
+  // Verifikasi Email & Password Sign In
   const handlePasswordSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    const query = emailOrUser.trim().toLowerCase();
     const matched = allUsers.find(
       (u) =>
-        u.username.toLowerCase() === username.trim().toLowerCase() &&
+        (u.email?.toLowerCase() === query ||
+         u.username?.toLowerCase() === query ||
+         u.display_name?.toLowerCase() === query) &&
         (u.password === password || u.pin === password)
     );
 
     if (matched) {
-      onLogin(matched);
+      onLogin({
+        ...matched,
+        name: matched.display_name || matched.name || 'Kasir',
+      });
     } else {
-      setError('Username atau Password salah.');
+      setError('Email/Username atau Kata Sandi salah.');
     }
   };
 
-  // Handle Registrasi Akun Baru (Sign Up)
-  const handleSignUpSubmit = (e: React.FormEvent) => {
+  // Handle Registrasi Akun Baru (Sign Up) ke Supabase Table 'users'
+  const handleSignUpSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+    setIsLoading(true);
 
-    const trimmedUser = regUsername.trim().toLowerCase();
-    const trimmedName = regName.trim();
-    const trimmedPin = regPin.trim();
+    const displayName = regDisplayName.trim();
+    const email = regEmail.trim().toLowerCase();
+    const pass = regPassword.trim();
+    const pinCode = regPin.trim();
 
-    if (!trimmedName || !trimmedUser || !trimmedPin) {
-      setError('Semua kolom pendaftaran wajib diisi.');
+    if (!displayName || !email || !pass || !pinCode) {
+      setError('Seluruh kolom pendaftaran wajib diisi.');
+      setIsLoading(false);
       return;
     }
 
-    if (allUsers.some((u) => u.username.toLowerCase() === trimmedUser)) {
-      setError(`Username "${trimmedUser}" sudah terdaftar. Silakan gunakan username lain.`);
+    if (pinCode.length < 4) {
+      setError('PIN harus minimal 4 angka untuk login cepat.');
+      setIsLoading(false);
       return;
     }
 
-    const newUser: AuthUser & { password?: string } = {
-      id: `user-${Date.now()}`,
-      name: trimmedName,
-      username: trimmedUser,
+    if (allUsers.some((u) => u.email?.toLowerCase() === email)) {
+      setError(`Email "${email}" sudah terdaftar. Silakan gunakan email lain.`);
+      setIsLoading(false);
+      return;
+    }
+
+    const payload = {
+      display_name: displayName,
+      email: email,
+      password: pass,
+      pin: pinCode,
       role: regRole,
-      pin: trimmedPin,
-      password: trimmedPin,
     };
 
+    let createdUser: AuthUser = {
+      id: `user-${Date.now()}`,
+      display_name: displayName,
+      name: displayName,
+      email: email,
+      role: regRole,
+      pin: pinCode,
+      password: pass,
+    };
+
+    // 1. Simpan ke Supabase cloud (tabel users)
+    try {
+      const res = await fetch('/api/users', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+
+      if (res.ok) {
+        const cloudData = await res.json();
+        if (cloudData?.id) {
+          createdUser = {
+            id: cloudData.id,
+            display_name: cloudData.display_name,
+            name: cloudData.display_name,
+            email: cloudData.email,
+            role: cloudData.role,
+            pin: cloudData.pin,
+            password: pass,
+          };
+        }
+      } else {
+        const errJson = await res.json().catch(() => ({}));
+        console.warn('Supabase users table insert response:', errJson);
+      }
+    } catch (cloudErr) {
+      console.warn('Cloud sync error, saving locally:', cloudErr);
+    }
+
+    // 2. Simpan juga ke LocalStorage untuk offline tolerance
     try {
       const saved = localStorage.getItem('centpos_registered_users');
       const existing = saved ? JSON.parse(saved) : [];
-      const updated = [...existing, newUser];
+      const updated = [...existing, createdUser];
       localStorage.setItem('centpos_registered_users', JSON.stringify(updated));
-      setAllUsers([...DEFAULT_USERS, ...updated]);
-    } catch (err) {
-      console.error(err);
+      setAllUsers((prev) => [...prev, createdUser]);
+    } catch (localErr) {
+      console.error(localErr);
     }
 
-    setSuccess(`Akun "${trimmedName}" berhasil dibuat! Masuk sekarang...`);
+    setIsLoading(false);
+    setSuccess(`Akun "${displayName}" berhasil didaftarkan! Masuk sekarang...`);
     setTimeout(() => {
-      onLogin(newUser);
-    }, 800);
+      onLogin(createdUser);
+    }, 700);
   };
 
   // Quick Login Preset
   const handleQuickLogin = (user: typeof DEFAULT_USERS[0]) => {
-    onLogin(user);
+    onLogin({
+      ...user,
+      name: user.display_name,
+    });
   };
 
   return (
@@ -209,10 +304,10 @@ export const LoginView: React.FC<LoginViewProps> = ({ settings, onLogin }) => {
             <div className="text-center pb-1">
               <h2 className="text-base font-bold text-slate-900 flex items-center justify-center gap-1.5">
                 <UserPlus className="w-4 h-4 text-emerald-600" />
-                <span>Buat Akun Kasir Baru (Sign Up)</span>
+                <span>Pendaftaran Akun Baru (Sign Up)</span>
               </h2>
               <p className="text-xs text-slate-500 mt-0.5">
-                Daftarkan akun kasir atau pengelola toko Anda
+                Akun akan tersimpan ke cloud database tabel <code className="bg-slate-100 px-1 py-0.5 rounded font-mono text-[11px] text-emerald-700">users</code>
               </p>
             </div>
 
@@ -230,52 +325,79 @@ export const LoginView: React.FC<LoginViewProps> = ({ settings, onLogin }) => {
               </div>
             )}
 
-            <form onSubmit={handleSignUpSubmit} className="space-y-3.5 text-xs">
+            <form onSubmit={handleSignUpSubmit} className="space-y-3 text-xs">
               <div>
                 <label className="block font-semibold text-slate-700 mb-1">
-                  Nama Lengkap Kasir / Pemilik *
+                  Nama Tampilan (display_name) *
                 </label>
-                <input
-                  type="text"
-                  required
-                  placeholder="Contoh: Budi Santoso"
-                  value={regName}
-                  onChange={(e) => setRegName(e.target.value)}
-                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-hidden focus:ring-2 focus:ring-emerald-500 focus:bg-white"
-                />
+                <div className="relative">
+                  <User className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="text"
+                    required
+                    placeholder="Contoh: Budi Santoso"
+                    value={regDisplayName}
+                    onChange={(e) => setRegDisplayName(e.target.value)}
+                    className="w-full pl-10 pr-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-hidden focus:ring-2 focus:ring-emerald-500 focus:bg-white"
+                  />
+                </div>
               </div>
 
               <div>
                 <label className="block font-semibold text-slate-700 mb-1">
-                  Username *
+                  Alamat Email (email) *
                 </label>
-                <input
-                  type="text"
-                  required
-                  placeholder="Contoh: budi"
-                  value={regUsername}
-                  onChange={(e) => setRegUsername(e.target.value)}
-                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-hidden focus:ring-2 focus:ring-emerald-500 focus:bg-white"
-                />
+                <div className="relative">
+                  <Mail className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="email"
+                    required
+                    placeholder="Contoh: budi@gmail.com"
+                    value={regEmail}
+                    onChange={(e) => setRegEmail(e.target.value)}
+                    className="w-full pl-10 pr-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-hidden focus:ring-2 focus:ring-emerald-500 focus:bg-white"
+                  />
+                </div>
               </div>
 
               <div>
                 <label className="block font-semibold text-slate-700 mb-1">
-                  PIN / Kata Sandi (4–6 Digit) *
+                  Kata Sandi (password) *
                 </label>
-                <input
-                  type="password"
-                  required
-                  placeholder="Contoh: 1234"
-                  value={regPin}
-                  onChange={(e) => setRegPin(e.target.value)}
-                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-hidden focus:ring-2 focus:ring-emerald-500 focus:bg-white font-mono"
-                />
+                <div className="relative">
+                  <Lock className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="password"
+                    required
+                    placeholder="Kata sandi login..."
+                    value={regPassword}
+                    onChange={(e) => setRegPassword(e.target.value)}
+                    className="w-full pl-10 pr-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-hidden focus:ring-2 focus:ring-emerald-500 focus:bg-white"
+                  />
+                </div>
               </div>
 
               <div>
                 <label className="block font-semibold text-slate-700 mb-1">
-                  Peran Akun (Role)
+                  PIN Kasir Cepat (pin 4–6 Digit) *
+                </label>
+                <div className="relative">
+                  <KeyRound className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="password"
+                    required
+                    maxLength={6}
+                    placeholder="Contoh: 1234"
+                    value={regPin}
+                    onChange={(e) => setRegPin(e.target.value.replace(/[^0-9]/g, ''))}
+                    className="w-full pl-10 pr-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-hidden focus:ring-2 focus:ring-emerald-500 focus:bg-white font-mono"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block font-semibold text-slate-700 mb-1">
+                  Peran Akun (role)
                 </label>
                 <div className="grid grid-cols-2 gap-2">
                   <button
@@ -305,9 +427,10 @@ export const LoginView: React.FC<LoginViewProps> = ({ settings, onLogin }) => {
 
               <button
                 type="submit"
-                className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 active:scale-98 text-white rounded-xl text-sm font-bold shadow-md transition-all flex items-center justify-center gap-2 mt-4"
+                disabled={isLoading}
+                className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 active:scale-98 text-white rounded-xl text-sm font-bold shadow-md transition-all flex items-center justify-center gap-2 mt-4 disabled:opacity-50"
               >
-                <span>Daftar & Masuk Sekarang</span>
+                <span>{isLoading ? 'Menyimpan Akun...' : 'Daftar & Masuk Sekarang'}</span>
                 <ArrowRight className="w-4 h-4" />
               </button>
             </form>
@@ -360,8 +483,8 @@ export const LoginView: React.FC<LoginViewProps> = ({ settings, onLogin }) => {
                     : 'text-slate-500 hover:text-slate-800'
                 }`}
               >
-                <User className="w-3.5 h-3.5" />
-                <span>Username & Sandi</span>
+                <Mail className="w-3.5 h-3.5" />
+                <span>Email & Sandi</span>
               </button>
             </div>
 
@@ -450,21 +573,21 @@ export const LoginView: React.FC<LoginViewProps> = ({ settings, onLogin }) => {
               </div>
             )}
 
-            {/* Body 2: Mode Username & Password */}
+            {/* Body 2: Mode Email & Password */}
             {tab === 'password' && (
               <form onSubmit={handlePasswordSubmit} className="p-6 space-y-4">
                 <div>
                   <label className="block text-xs font-semibold text-slate-700 mb-1">
-                    Username Kasir
+                    Alamat Email Kasir
                   </label>
                   <div className="relative">
-                    <User className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                    <Mail className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
                     <input
                       type="text"
                       required
-                      placeholder="admin atau kasir"
-                      value={username}
-                      onChange={(e) => setUsername(e.target.value)}
+                      placeholder="admin@centpos.com atau kasir@centpos.com"
+                      value={emailOrUser}
+                      onChange={(e) => setEmailOrUser(e.target.value)}
                       className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-hidden focus:ring-2 focus:ring-emerald-500 focus:bg-white"
                     />
                   </div>
@@ -557,7 +680,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ settings, onLogin }) => {
 
       <div className="mt-4 text-center text-xs text-slate-400 flex items-center justify-center gap-1.5">
         <ShieldCheck className="w-3.5 h-3.5 text-emerald-500" />
-        <span>CentPOS Secure Session & Local Persistence</span>
+        <span>CentPOS Cloud Database & Local Persistence</span>
       </div>
     </div>
   );
