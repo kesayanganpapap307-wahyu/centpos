@@ -24,6 +24,8 @@ export async function GET() {
     barcode: p.barcode,
     buyPrice: Number(p.buy_price || 0),
     sellPrice: Number(p.sell_price || 0),
+    agentPrice: p.agent_price ? Number(p.agent_price) : undefined,
+    memberPrice: p.member_price ? Number(p.member_price) : undefined,
     stock: Number(p.stock || 0),
     unit: p.unit || 'pcs',
     color: p.color || 'bg-emerald-500',
@@ -40,7 +42,7 @@ export async function POST(request: Request) {
 
   try {
     const body = await request.json();
-    const payload = {
+    const payload: Record<string, any> = {
       name: body.name,
       category: body.category || 'Lainnya',
       barcode: body.barcode || null,
@@ -52,50 +54,76 @@ export async function POST(request: Request) {
       updated_at: new Date().toISOString(),
     };
 
+    if (body.agentPrice !== undefined) payload.agent_price = body.agentPrice || null;
+    if (body.memberPrice !== undefined) payload.member_price = body.memberPrice || null;
+
     // If UUID (not a temporary client id like prd-123)
     const isRealUuid =
       body.id &&
       /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(body.id);
 
+    let dataResult: any = null;
+
     if (isRealUuid) {
-      const { data, error } = await supabase
+      let { data, error } = await supabase
         .from('products')
         .upsert({ id: body.id, ...payload })
         .select()
         .single();
 
-      if (error) throw error;
-      return NextResponse.json({
-        id: data.id,
-        name: data.name,
-        category: data.category,
-        barcode: data.barcode,
-        buyPrice: Number(data.buy_price),
-        sellPrice: Number(data.sell_price),
-        stock: Number(data.stock),
-        unit: data.unit,
-        color: data.color,
-      });
+      if (error && error.message?.toLowerCase().includes('column')) {
+        // Fallback jika column agent_price belum dibuat di Supabase
+        delete payload.agent_price;
+        delete payload.member_price;
+        const retry = await supabase
+          .from('products')
+          .upsert({ id: body.id, ...payload })
+          .select()
+          .single();
+        if (retry.error) throw retry.error;
+        dataResult = retry.data;
+      } else if (error) {
+        throw error;
+      } else {
+        dataResult = data;
+      }
     } else {
-      const { data, error } = await supabase
+      let { data, error } = await supabase
         .from('products')
         .insert(payload)
         .select()
         .single();
 
-      if (error) throw error;
-      return NextResponse.json({
-        id: data.id,
-        name: data.name,
-        category: data.category,
-        barcode: data.barcode,
-        buyPrice: Number(data.buy_price),
-        sellPrice: Number(data.sell_price),
-        stock: Number(data.stock),
-        unit: data.unit,
-        color: data.color,
-      });
+      if (error && error.message?.toLowerCase().includes('column')) {
+        delete payload.agent_price;
+        delete payload.member_price;
+        const retry = await supabase
+          .from('products')
+          .insert(payload)
+          .select()
+          .single();
+        if (retry.error) throw retry.error;
+        dataResult = retry.data;
+      } else if (error) {
+        throw error;
+      } else {
+        dataResult = data;
+      }
     }
+
+    return NextResponse.json({
+      id: dataResult.id,
+      name: dataResult.name,
+      category: dataResult.category,
+      barcode: dataResult.barcode,
+      buyPrice: Number(dataResult.buy_price),
+      sellPrice: Number(dataResult.sell_price),
+      agentPrice: dataResult.agent_price ? Number(dataResult.agent_price) : body.agentPrice,
+      memberPrice: dataResult.member_price ? Number(dataResult.member_price) : body.memberPrice,
+      stock: Number(dataResult.stock),
+      unit: dataResult.unit,
+      color: dataResult.color,
+    });
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }

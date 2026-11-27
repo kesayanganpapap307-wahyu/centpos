@@ -18,7 +18,7 @@ import {
   Barcode,
   Upload
 } from 'lucide-react';
-import { Product, CartItem, Category, StoreSettings, Transaction, PaymentMethod } from '../types/pos';
+import { Product, CartItem, Category, StoreSettings, Transaction, PaymentMethod, CustomerTier } from '../types/pos';
 import { formatCurrency, generateInvoiceNumber } from '../utils/format';
 
 interface CashierViewProps {
@@ -40,11 +40,34 @@ export const CashierView: React.FC<CashierViewProps> = ({
 }) => {
   // State
   const [selectedCategory, setSelectedCategory] = useState<Category>('Semua');
+  const [selectedTier, setSelectedTier] = useState<CustomerTier>('customer');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [cart, setCart] = useState<CartItem[]>([]);
   const [customerName, setCustomerName] = useState<string>('Pelanggan Umum');
   const [discountPercent, setDiscountPercent] = useState<number>(0);
   const [isCheckoutModalOpen, setIsCheckoutModalOpen] = useState<boolean>(false);
+
+  // Helper untuk mendapatkan harga jual berdasarkan tier harga (Customer, Agen, Member)
+  const getProductPriceForTier = (product: Product, tier: CustomerTier = selectedTier) => {
+    if (tier === 'agen' && product.agentPrice && product.agentPrice > 0) {
+      return product.agentPrice;
+    }
+    if (tier === 'member' && product.memberPrice && product.memberPrice > 0) {
+      return product.memberPrice;
+    }
+    return product.sellPrice;
+  };
+
+  const handleTierChange = (newTier: CustomerTier) => {
+    setSelectedTier(newTier);
+    setCart((prevCart) =>
+      prevCart.map((item) => ({
+        ...item,
+        priceTier: newTier,
+        selectedPrice: getProductPriceForTier(item.product, newTier),
+      }))
+    );
+  };
 
   // Checkout State
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('TUNAI');
@@ -68,6 +91,7 @@ export const CashierView: React.FC<CashierViewProps> = ({
   // Cart operations
   const addToCart = (product: Product) => {
     if (product.stock <= 0) return;
+    const tierPrice = getProductPriceForTier(product, selectedTier);
 
     setCart((prevCart) => {
       const existing = prevCart.find((item) => item.product.id === product.id);
@@ -79,7 +103,7 @@ export const CashierView: React.FC<CashierViewProps> = ({
             : item
         );
       }
-      return [...prevCart, { product, quantity: 1 }];
+      return [...prevCart, { product, quantity: 1, selectedPrice: tierPrice, priceTier: selectedTier }];
     });
   };
 
@@ -123,8 +147,11 @@ export const CashierView: React.FC<CashierViewProps> = ({
 
   // Calculations
   const subtotal = useMemo(() => {
-    return cart.reduce((acc, item) => acc + item.product.sellPrice * item.quantity, 0);
-  }, [cart]);
+    return cart.reduce((acc, item) => {
+      const itemPrice = item.selectedPrice ?? getProductPriceForTier(item.product, item.priceTier || selectedTier);
+      return acc + itemPrice * item.quantity;
+    }, 0);
+  }, [cart, selectedTier]);
 
   const discountAmount = useMemo(() => {
     return (subtotal * discountPercent) / 100;
@@ -161,19 +188,31 @@ export const CashierView: React.FC<CashierViewProps> = ({
       return;
     }
 
+    const defaultCustomerLabel =
+      selectedTier === 'agen'
+        ? 'Pelanggan Agen'
+        : selectedTier === 'member'
+        ? 'Pelanggan Member'
+        : 'Pelanggan Umum';
+
     const transaction: Transaction = {
       id: `trx-${Date.now()}`,
       invoiceNumber: generateInvoiceNumber(),
       createdAt: new Date().toISOString(),
       cashierName: settings.cashierName,
-      customerName: customerName.trim() || 'Pelanggan Umum',
-      items: cart.map((item) => ({
-        productId: item.product.id,
-        productName: item.product.name,
-        quantity: item.quantity,
-        sellPrice: item.product.sellPrice,
-        subtotal: item.product.sellPrice * item.quantity,
-      })),
+      customerName: customerName.trim() || defaultCustomerLabel,
+      customerTier: selectedTier,
+      items: cart.map((item) => {
+        const itemPrice = item.selectedPrice ?? getProductPriceForTier(item.product, item.priceTier || selectedTier);
+        return {
+          productId: item.product.id,
+          productName: item.product.name,
+          quantity: item.quantity,
+          sellPrice: itemPrice,
+          subtotal: itemPrice * item.quantity,
+          priceTier: item.priceTier || selectedTier,
+        };
+      }),
       subtotal,
       discountAmount,
       taxAmount,
@@ -297,16 +336,45 @@ export const CashierView: React.FC<CashierViewProps> = ({
                     </div>
 
                     {/* Price & Cart counter */}
-                    <div className="mt-3 pt-2 border-t border-slate-100 flex items-center justify-between w-full">
-                      <span className="text-sm font-bold text-emerald-700">
-                        {formatCurrency(product.sellPrice)}
-                      </span>
-                      {inCart && (
-                        <span className="bg-emerald-600 text-white text-xs font-bold w-6 h-6 rounded-full flex items-center justify-center shadow-xs">
-                          {inCart.quantity}
-                        </span>
-                      )}
-                    </div>
+                    {(() => {
+                      const tierPrice = getProductPriceForTier(product, selectedTier);
+                      const isTierActive = selectedTier !== 'customer' && product.sellPrice !== tierPrice;
+
+                      return (
+                        <div className="mt-3 pt-2 border-t border-slate-100 flex items-center justify-between w-full">
+                          <div className="flex flex-col">
+                            {isTierActive ? (
+                              <>
+                                <span className="text-[10px] line-through text-slate-400 leading-none">
+                                  {formatCurrency(product.sellPrice)}
+                                </span>
+                                <div className="flex items-center gap-1 mt-0.5">
+                                  <span className={`text-sm font-bold ${
+                                    selectedTier === 'agen' ? 'text-blue-700' : 'text-purple-700'
+                                  }`}>
+                                    {formatCurrency(tierPrice)}
+                                  </span>
+                                  <span className={`text-[9px] font-bold px-1 py-0.2 rounded uppercase ${
+                                    selectedTier === 'agen' ? 'bg-blue-100 text-blue-800' : 'bg-purple-100 text-purple-800'
+                                  }`}>
+                                    {selectedTier}
+                                  </span>
+                                </div>
+                              </>
+                            ) : (
+                              <span className="text-sm font-bold text-emerald-700">
+                                {formatCurrency(product.sellPrice)}
+                              </span>
+                            )}
+                          </div>
+                          {inCart && (
+                            <span className="bg-emerald-600 text-white text-xs font-bold w-6 h-6 rounded-full flex items-center justify-center shadow-xs">
+                              {inCart.quantity}
+                            </span>
+                          )}
+                        </div>
+                      );
+                    })()}
                   </button>
                 );
               })}
@@ -349,6 +417,57 @@ export const CashierView: React.FC<CashierViewProps> = ({
           />
         </div>
 
+        {/* Customer Tier / Tipe Harga Switcher */}
+        <div className="px-4 py-2 bg-slate-50/80 border-b border-slate-200">
+          <div className="flex items-center justify-between mb-1.5 text-[11px] font-bold text-slate-700">
+            <span>Tipe Harga Jual:</span>
+            <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
+              selectedTier === 'agen'
+                ? 'bg-blue-100 text-blue-800'
+                : selectedTier === 'member'
+                ? 'bg-purple-100 text-purple-800'
+                : 'bg-emerald-100 text-emerald-800'
+            }`}>
+              {selectedTier === 'agen' ? '🏢 Harga Agen' : selectedTier === 'member' ? '⭐ Harga Member' : '👤 Customer Umum'}
+            </span>
+          </div>
+          <div className="grid grid-cols-3 gap-1 text-[11px] font-bold">
+            <button
+              type="button"
+              onClick={() => handleTierChange('customer')}
+              className={`py-1.5 px-1.5 rounded-lg border text-center transition-all ${
+                selectedTier === 'customer'
+                  ? 'bg-emerald-600 text-white border-emerald-600 shadow-2xs'
+                  : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-100'
+              }`}
+            >
+              Customer
+            </button>
+            <button
+              type="button"
+              onClick={() => handleTierChange('agen')}
+              className={`py-1.5 px-1.5 rounded-lg border text-center transition-all ${
+                selectedTier === 'agen'
+                  ? 'bg-blue-600 text-white border-blue-600 shadow-2xs'
+                  : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-100'
+              }`}
+            >
+              🏢 Agen
+            </button>
+            <button
+              type="button"
+              onClick={() => handleTierChange('member')}
+              className={`py-1.5 px-1.5 rounded-lg border text-center transition-all ${
+                selectedTier === 'member'
+                  ? 'bg-purple-600 text-white border-purple-600 shadow-2xs'
+                  : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-100'
+              }`}
+            >
+              ⭐ Member
+            </button>
+          </div>
+        </div>
+
         {/* Cart Items List */}
         <div className="flex-1 overflow-y-auto p-4 space-y-3">
           {cart.length === 0 ? (
@@ -360,22 +479,35 @@ export const CashierView: React.FC<CashierViewProps> = ({
               </p>
             </div>
           ) : (
-            cart.map((item) => (
-              <div
-                key={item.product.id}
-                className="flex items-center justify-between p-3 rounded-xl bg-slate-50 border border-slate-100 hover:border-slate-200 transition-colors"
-              >
-                <div className="flex-1 pr-2">
-                  <h5 className="font-semibold text-xs text-slate-900 line-clamp-1">
-                    {item.product.name}
-                  </h5>
-                  <p className="text-[11px] text-slate-500 mt-0.5">
-                    {formatCurrency(item.product.sellPrice)} / {item.product.unit}
-                  </p>
-                  <p className="text-xs font-bold text-emerald-700 mt-1">
-                    {formatCurrency(item.product.sellPrice * item.quantity)}
-                  </p>
-                </div>
+            cart.map((item) => {
+              const itemPrice = item.selectedPrice ?? getProductPriceForTier(item.product, item.priceTier || selectedTier);
+              const isSpecialTier = item.priceTier && item.priceTier !== 'customer';
+
+              return (
+                <div
+                  key={item.product.id}
+                  className="flex items-center justify-between p-3 rounded-xl bg-slate-50 border border-slate-100 hover:border-slate-200 transition-colors"
+                >
+                  <div className="flex-1 pr-2">
+                    <div className="flex items-center gap-1.5">
+                      <h5 className="font-semibold text-xs text-slate-900 line-clamp-1">
+                        {item.product.name}
+                      </h5>
+                      {isSpecialTier && (
+                        <span className={`text-[9px] font-bold px-1.5 py-0.2 rounded uppercase ${
+                          item.priceTier === 'agen' ? 'bg-blue-100 text-blue-800' : 'bg-purple-100 text-purple-800'
+                        }`}>
+                          {item.priceTier}
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-[11px] text-slate-500 mt-0.5">
+                      {formatCurrency(itemPrice)} / {item.product.unit}
+                    </p>
+                    <p className="text-xs font-bold text-emerald-700 mt-1">
+                      {formatCurrency(itemPrice * item.quantity)}
+                    </p>
+                  </div>
 
                 {/* Stepper Controls */}
                 <div className="flex items-center gap-2">
@@ -403,9 +535,10 @@ export const CashierView: React.FC<CashierViewProps> = ({
                   </button>
                 </div>
               </div>
-            ))
-          )}
-        </div>
+            );
+          })
+        )}
+      </div>
 
         {/* Cart Summary & Checkout Footer */}
         <div className="p-4 border-t border-slate-200 bg-slate-50/50 space-y-3">

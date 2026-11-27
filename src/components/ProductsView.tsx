@@ -42,6 +42,8 @@ export const ProductsView: React.FC<ProductsViewProps> = ({
   const [barcode, setBarcode] = useState('');
   const [buyPrice, setBuyPrice] = useState<number>(0);
   const [sellPrice, setSellPrice] = useState<number>(0);
+  const [agentPrice, setAgentPrice] = useState<number | undefined>(undefined);
+  const [memberPrice, setMemberPrice] = useState<number | undefined>(undefined);
   const [stock, setStock] = useState<number>(0);
   const [unit, setUnit] = useState('pcs');
 
@@ -62,6 +64,8 @@ export const ProductsView: React.FC<ProductsViewProps> = ({
     setBarcode(`899${Math.floor(1000 + Math.random() * 9000)}`);
     setBuyPrice(0);
     setSellPrice(0);
+    setAgentPrice(undefined);
+    setMemberPrice(undefined);
     setStock(10);
     setUnit('pcs');
     setIsModalOpen(true);
@@ -74,6 +78,8 @@ export const ProductsView: React.FC<ProductsViewProps> = ({
     setBarcode(p.barcode);
     setBuyPrice(p.buyPrice);
     setSellPrice(p.sellPrice);
+    setAgentPrice(p.agentPrice);
+    setMemberPrice(p.memberPrice);
     setStock(p.stock);
     setUnit(p.unit);
     setIsModalOpen(true);
@@ -83,6 +89,9 @@ export const ProductsView: React.FC<ProductsViewProps> = ({
     e.preventDefault();
     if (!name.trim()) return;
 
+    const finalAgent = agentPrice && agentPrice > 0 ? agentPrice : undefined;
+    const finalMember = memberPrice && memberPrice > 0 ? memberPrice : undefined;
+
     if (editingProduct) {
       onUpdateProduct({
         ...editingProduct,
@@ -91,6 +100,8 @@ export const ProductsView: React.FC<ProductsViewProps> = ({
         barcode: barcode.trim(),
         buyPrice,
         sellPrice,
+        agentPrice: finalAgent,
+        memberPrice: finalMember,
         stock,
         unit: unit.trim() || 'pcs',
       });
@@ -113,6 +124,8 @@ export const ProductsView: React.FC<ProductsViewProps> = ({
         barcode: barcode.trim() || `899${Date.now().toString().slice(-4)}`,
         buyPrice,
         sellPrice,
+        agentPrice: finalAgent,
+        memberPrice: finalMember,
         stock,
         unit: unit.trim() || 'pcs',
         color: randomColor,
@@ -262,12 +275,24 @@ export const ProductsView: React.FC<ProductsViewProps> = ({
 
                   <div className="flex items-end justify-between pt-3 border-t border-slate-100">
                     <div>
-                      <span className="text-[11px] text-slate-400 block font-medium">Harga Jual</span>
+                      <span className="text-[11px] text-slate-400 block font-medium">Harga Customer</span>
                       <span className="text-base font-bold text-slate-900">
                         {formatCurrency(item.sellPrice)}
                       </span>
+                      <div className="flex flex-wrap gap-1 mt-1">
+                        {item.agentPrice && item.agentPrice > 0 ? (
+                          <span className="text-[10px] font-semibold text-blue-700 bg-blue-50 border border-blue-200 px-1.5 py-0.5 rounded">
+                            Agen: {formatCurrency(item.agentPrice)}
+                          </span>
+                        ) : null}
+                        {item.memberPrice && item.memberPrice > 0 ? (
+                          <span className="text-[10px] font-semibold text-purple-700 bg-purple-50 border border-purple-200 px-1.5 py-0.5 rounded">
+                            Member: {formatCurrency(item.memberPrice)}
+                          </span>
+                        ) : null}
+                      </div>
                       {item.buyPrice > 0 && (
-                        <span className="text-[11px] text-slate-400 block">
+                        <span className="text-[11px] text-slate-400 block mt-0.5">
                           Modal: {formatCurrency(item.buyPrice)}
                         </span>
                       )}
@@ -357,7 +382,17 @@ export const ProductsView: React.FC<ProductsViewProps> = ({
                           {formatCurrency(item.buyPrice)}
                         </td>
                         <td className="px-4 py-3.5 text-right font-bold text-slate-900">
-                          {formatCurrency(item.sellPrice)}
+                          <div>{formatCurrency(item.sellPrice)}</div>
+                          {item.agentPrice && item.agentPrice > 0 ? (
+                            <div className="text-[10px] text-blue-700 font-medium">
+                              Agen: {formatCurrency(item.agentPrice)}
+                            </div>
+                          ) : null}
+                          {item.memberPrice && item.memberPrice > 0 ? (
+                            <div className="text-[10px] text-purple-700 font-medium">
+                              Member: {formatCurrency(item.memberPrice)}
+                            </div>
+                          ) : null}
                         </td>
                         <td className="px-4 py-3.5 text-center">
                           <span
@@ -486,7 +521,9 @@ export const ProductsView: React.FC<ProductsViewProps> = ({
                 </div>
 
                 <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Harga Jual (Rp) *</label>
+                  <label className="block font-semibold text-slate-700 mb-1">
+                    Harga Customer Umum (Rp) *
+                  </label>
                   <input
                     type="number"
                     min={0}
@@ -496,6 +533,45 @@ export const ProductsView: React.FC<ProductsViewProps> = ({
                     className="w-full px-3.5 py-2 border border-slate-300 rounded-xl text-sm font-bold text-emerald-700 focus:ring-2 focus:ring-emerald-500 focus:outline-hidden"
                   />
                 </div>
+              </div>
+
+              {/* Tingkatan Harga Jual (Agen / Member) */}
+              <div className="p-3.5 bg-slate-50/90 border border-slate-200 rounded-2xl space-y-2">
+                <span className="block font-bold text-slate-800 text-xs">
+                  Tingkatan Harga Khusus (Opsional):
+                </span>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block font-semibold text-slate-700 mb-1 text-[11px]">
+                      🏢 Harga Agen / Reseller (Rp)
+                    </label>
+                    <input
+                      type="number"
+                      min={0}
+                      placeholder="Contoh: 15000"
+                      value={agentPrice ?? ''}
+                      onChange={(e) => setAgentPrice(e.target.value ? Number(e.target.value) : undefined)}
+                      className="w-full px-3 py-2 border border-slate-300 rounded-xl text-sm font-bold text-blue-700 bg-white focus:ring-2 focus:ring-blue-500 focus:outline-hidden"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block font-semibold text-slate-700 mb-1 text-[11px]">
+                      ⭐ Harga Member / VIP (Rp)
+                    </label>
+                    <input
+                      type="number"
+                      min={0}
+                      placeholder="Contoh: 16500"
+                      value={memberPrice ?? ''}
+                      onChange={(e) => setMemberPrice(e.target.value ? Number(e.target.value) : undefined)}
+                      className="w-full px-3 py-2 border border-slate-300 rounded-xl text-sm font-bold text-purple-700 bg-white focus:ring-2 focus:ring-purple-500 focus:outline-hidden"
+                    />
+                  </div>
+                </div>
+                <p className="text-[10px] text-slate-400 leading-tight">
+                  * Biarkan kosong jika produk ini ingin tetap menggunakan harga customer umum.
+                </p>
               </div>
 
               <div>

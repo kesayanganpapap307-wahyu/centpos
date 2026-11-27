@@ -73,6 +73,12 @@ export const ReceiptPrint: React.FC<ReceiptPrintProps> = ({
                 <span>Pelanggan:</span>
                 <span>{transaction.customerName}</span>
               </div>
+              {transaction.customerTier && transaction.customerTier !== 'customer' && (
+                <div className="flex justify-between text-blue-700 font-semibold">
+                  <span>Tipe Harga:</span>
+                  <span className="uppercase">{transaction.customerTier === 'agen' ? 'Harga Agen' : 'Harga Member'}</span>
+                </div>
+              )}
             </div>
 
             {/* List Barang */}

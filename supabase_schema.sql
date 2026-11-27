@@ -11,12 +11,18 @@ CREATE TABLE IF NOT EXISTS products (
     barcode VARCHAR(100) UNIQUE,
     buy_price NUMERIC(15, 2) NOT NULL DEFAULT 0,
     sell_price NUMERIC(15, 2) NOT NULL DEFAULT 0,
+    agent_price NUMERIC(15, 2), -- Harga khusus Agen / Reseller
+    member_price NUMERIC(15, 2), -- Harga khusus Member / Khusus
     stock INTEGER NOT NULL DEFAULT 0,
     unit VARCHAR(50) NOT NULL DEFAULT 'pcs',
     color VARCHAR(50) DEFAULT 'bg-emerald-500',
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
+
+-- Migrasi tambahan jika tabel products sudah ada sebelumnya:
+ALTER TABLE products ADD COLUMN IF NOT EXISTS agent_price NUMERIC(15, 2);
+ALTER TABLE products ADD COLUMN IF NOT EXISTS member_price NUMERIC(15, 2);
 
 -- 2. Tabel Transaksi / Penjualan
 CREATE TABLE IF NOT EXISTS transactions (

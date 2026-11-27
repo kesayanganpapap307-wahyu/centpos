@@ -1,4 +1,5 @@
 export type Category = 'Semua' | 'Makanan' | 'Minuman' | 'Snack' | 'Sembako' | 'Lainnya';
+export type CustomerTier = 'customer' | 'agen' | 'member';
 
 export interface Product {
   id: string;
@@ -6,7 +7,9 @@ export interface Product {
   category: Category;
   barcode: string;
   buyPrice: number;
-  sellPrice: number;
+  sellPrice: number; // Harga Jual Customer Umum
+  agentPrice?: number; // Harga Jual Agen / Reseller
+  memberPrice?: number; // Harga Jual Member / Khusus
   stock: number;
   unit: string;
   image?: string;
@@ -17,6 +20,8 @@ export interface CartItem {
   product: Product;
   quantity: number;
   discountPercent?: number;
+  selectedPrice?: number;
+  priceTier?: CustomerTier;
 }
 
 export type PaymentMethod = 'TUNAI' | 'QRIS' | 'TRANSFER' | 'DEBIT';
@@ -27,12 +32,14 @@ export interface Transaction {
   createdAt: string;
   cashierName: string;
   customerName: string;
+  customerTier?: CustomerTier;
   items: {
     productId: string;
     productName: string;
     quantity: number;
     sellPrice: number;
     subtotal: number;
+    priceTier?: CustomerTier;
   }[];
   subtotal: number;
   discountAmount: number;
