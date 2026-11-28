@@ -170,7 +170,8 @@ export async function getCentCmsServerKeyWithDebug(
 
     const matchedRow = rows.find((row: Record<string, any>) => {
       const rowProvider = String(
-        row.provider ||
+        row.provider_key ||
+          row.provider ||
           row.provider_code ||
           row.provider_name ||
           row.provider_slug ||
