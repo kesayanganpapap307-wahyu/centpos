@@ -16,12 +16,7 @@ import {
   Lock,
   Crown,
   Sparkles,
-  CreditCard,
-  Key,
-  Eye,
-  EyeOff,
-  ExternalLink,
-  Info
+  CreditCard
 } from 'lucide-react';
 import { StoreSettings } from '../types/pos';
 
@@ -38,7 +33,6 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
 }) => {
   const [formData, setFormData] = useState<StoreSettings>({ ...settings });
   const [isSaved, setIsSaved] = useState(false);
-  const [showServerKey, setShowServerKey] = useState(false);
   const [cmsStatus, setCmsStatus] = useState<{
     loading: boolean;
     connected: boolean;
@@ -482,126 +476,39 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                 )}
               </div>
 
-              <p className="text-slate-500 text-[11px] leading-relaxed">
-                Konfigurasi utama diambil otomatis dari <b>CentPay CMS</b>. Kolom manual di bawah ini bersifat opsional sebagai cadangan (*fallback*) apabila environment Supabase CMS belum diisi.
-              </p>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
-                {/* Mode Environment: Sandbox / Production */}
-                <div className="sm:col-span-2 flex flex-col sm:flex-row sm:items-center justify-between p-3 bg-slate-50 border border-slate-200 rounded-xl gap-2">
-                  <div>
-                    <span className="font-semibold text-slate-800 block text-xs">
-                      Mode Transaksi Midtrans
-                    </span>
-                    <span className="text-slate-500 text-[11px]">
-                      Pilih <b>Sandbox</b> untuk uji coba tanpa uang asli, atau <b>Production</b> untuk menerima pembayaran riil.
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-1 bg-white p-1 border border-slate-200 rounded-lg shrink-0">
-                    <button
-                      type="button"
-                      onClick={() => setFormData({ ...formData, midtransIsProduction: false })}
-                      className={`px-3 py-1 text-[11px] font-bold rounded-md transition-all ${
-                        !formData.midtransIsProduction
-                          ? 'bg-amber-500 text-white shadow-xs'
-                          : 'text-slate-600 hover:text-slate-900'
-                      }`}
-                    >
-                      Sandbox (Test)
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setFormData({ ...formData, midtransIsProduction: true })}
-                      className={`px-3 py-1 text-[11px] font-bold rounded-md transition-all ${
-                        formData.midtransIsProduction
-                          ? 'bg-emerald-600 text-white shadow-xs'
-                          : 'text-slate-600 hover:text-slate-900'
-                      }`}
-                    >
-                      Production (Live)
-                    </button>
-                  </div>
-                </div>
-
-                {/* Client Key */}
+              {/* Mode Environment: Sandbox / Production */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between p-3 bg-slate-50 border border-slate-200 rounded-xl gap-2 text-xs">
                 <div>
-                  <label className="block font-semibold text-slate-700 mb-1">
-                    Midtrans Client Key *
-                  </label>
-                  <div className="relative">
-                    <input
-                      type="text"
-                      placeholder={formData.midtransIsProduction ? 'Mid-client-xxxxxxxx' : 'SB-Mid-client-xxxxxxxx'}
-                      value={formData.midtransClientKey || ''}
-                      onChange={(e) => setFormData({ ...formData, midtransClientKey: e.target.value.trim() })}
-                      className="w-full pl-8 pr-3 py-2 border border-slate-300 rounded-xl text-xs font-mono focus:ring-2 focus:ring-indigo-500 focus:outline-hidden"
-                    />
-                    <Key className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-2.5" />
-                  </div>
-                </div>
-
-                {/* Server Key */}
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">
-                    Midtrans Server Key *
-                  </label>
-                  <div className="relative">
-                    <input
-                      type={showServerKey ? 'text' : 'password'}
-                      placeholder={formData.midtransIsProduction ? 'Mid-server-xxxxxxxx' : 'SB-Mid-server-xxxxxxxx'}
-                      value={formData.midtransServerKey || ''}
-                      onChange={(e) => setFormData({ ...formData, midtransServerKey: e.target.value.trim() })}
-                      className="w-full pl-8 pr-9 py-2 border border-slate-300 rounded-xl text-xs font-mono focus:ring-2 focus:ring-indigo-500 focus:outline-hidden"
-                    />
-                    <Key className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-2.5" />
-                    <button
-                      type="button"
-                      onClick={() => setShowServerKey(!showServerKey)}
-                      className="absolute right-2.5 top-2.5 text-slate-400 hover:text-slate-600"
-                    >
-                      {showServerKey ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
-                    </button>
-                  </div>
-                </div>
-
-                {/* Harga Lisensi Modul */}
-                <div className="sm:col-span-2">
-                  <label className="block font-semibold text-slate-700 mb-1">
-                    Harga Modul Lisensi Multi-Tier (Rupiah)
-                  </label>
-                  <div className="relative max-w-xs">
-                    <span className="absolute left-3 top-2 font-bold text-slate-400 text-xs">Rp</span>
-                    <input
-                      type="number"
-                      min={10000}
-                      step={5000}
-                      value={formData.multiTierModulePrice || 99000}
-                      onChange={(e) => setFormData({ ...formData, multiTierModulePrice: Number(e.target.value) })}
-                      className="w-full pl-10 pr-3 py-2 border border-slate-300 rounded-xl text-xs font-bold text-slate-800 focus:ring-2 focus:ring-indigo-500 focus:outline-hidden"
-                    />
-                  </div>
-                  <span className="text-[10px] text-slate-400 mt-0.5 block">
-                    Nominal ini yang akan ditagihkan ke pembeli modul saat checkout Midtrans.
+                  <span className="font-semibold text-slate-800 block text-xs">
+                    Mode Transaksi Midtrans
+                  </span>
+                  <span className="text-slate-500 text-[11px]">
+                    Pilih <b>Sandbox</b> untuk uji coba tanpa uang asli, atau <b>Production</b> untuk menerima pembayaran riil.
                   </span>
                 </div>
-              </div>
-
-              {/* Info Bantuan Midtrans */}
-              <div className="p-3 bg-indigo-50/60 border border-indigo-100 rounded-xl flex items-start gap-2.5 text-[11px] text-indigo-900">
-                <Info className="w-4 h-4 text-indigo-600 shrink-0 mt-0.5" />
-                <div className="space-y-1">
-                  <p>
-                    Dapatkan Client Key & Server Key melalui portal resmi Midtrans di menu: <b>Settings &gt; Access Keys</b>.
-                  </p>
-                  <a
-                    href="https://dashboard.midtrans.com"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1 font-bold text-indigo-700 hover:text-indigo-800 underline"
+                <div className="flex items-center gap-1 bg-white p-1 border border-slate-200 rounded-lg shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => setFormData({ ...formData, midtransIsProduction: false })}
+                    className={`px-3 py-1 text-[11px] font-bold rounded-md transition-all ${
+                      !formData.midtransIsProduction
+                        ? 'bg-amber-500 text-white shadow-xs'
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
                   >
-                    <span>Buka Dashboard Midtrans</span>
-                    <ExternalLink className="w-3 h-3" />
-                  </a>
+                    Sandbox (Test)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setFormData({ ...formData, midtransIsProduction: true })}
+                    className={`px-3 py-1 text-[11px] font-bold rounded-md transition-all ${
+                      formData.midtransIsProduction
+                        ? 'bg-emerald-600 text-white shadow-xs'
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    Production (Live)
+                  </button>
                 </div>
               </div>
             </div>
