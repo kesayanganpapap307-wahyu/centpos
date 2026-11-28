@@ -122,17 +122,34 @@ export async function getCentCmsServerKeyWithDebug(
       // Abaikan jika tabel apps tidak ada atau menggunakan app_slug langsung
     }
 
-    // 2. Ambil baris dari tabel app_gateaway_providers (atau fallback app_gateway_providers)
+    // 2. Ambil baris dari tabel app_gateaway_providers (atau fallback app_gateway_providers / gateway_providers)
     let { data: rows, error } = await cmsSupabase
       .from('app_gateaway_providers')
       .select('*');
 
-    if (error && error.message?.toLowerCase().includes('does not exist')) {
-      const fallback = await cmsSupabase
+    const isMissingTableError = (msg?: string) => {
+      const lower = (msg || '').toLowerCase();
+      return (
+        lower.includes('does not exist') ||
+        lower.includes('could not find') ||
+        lower.includes('schema cache')
+      );
+    };
+
+    if (error && isMissingTableError(error.message)) {
+      const fallback1 = await cmsSupabase
         .from('app_gateway_providers')
         .select('*');
-      rows = fallback.data;
-      error = fallback.error;
+      rows = fallback1.data;
+      error = fallback1.error;
+
+      if (error && isMissingTableError(error.message)) {
+        const fallback2 = await cmsSupabase
+          .from('gateway_providers')
+          .select('*');
+        rows = fallback2.data;
+        error = fallback2.error;
+      }
     }
 
     if (error) {
