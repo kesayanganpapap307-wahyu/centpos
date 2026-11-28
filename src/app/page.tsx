@@ -136,7 +136,7 @@ CREATE POLICY "Allow all for transaction_items" ON transaction_items FOR ALL TO 
       if (savedUser) {
         const parsedUser: AuthUser = JSON.parse(savedUser);
         setCurrentUser(parsedUser);
-        setSettings((prev) => ({ ...prev, cashierName: parsedUser.name }));
+        setSettings((prev) => ({ ...prev, cashierName: parsedUser.name || parsedUser.display_name || prev.cashierName }));
       }
     } catch (e) {
       console.error('Error loading data from localStorage', e);
@@ -373,7 +373,7 @@ CREATE POLICY "Allow all for transaction_items" ON transaction_items FOR ALL TO 
   const handleLogin = (user: AuthUser) => {
     setCurrentUser(user);
     localStorage.setItem('centpos_user', JSON.stringify(user));
-    setSettings((prev) => ({ ...prev, cashierName: user.name }));
+    setSettings((prev) => ({ ...prev, cashierName: user.name || user.display_name || prev.cashierName }));
   };
 
   const handleLogout = () => {

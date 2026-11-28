@@ -63,6 +63,11 @@ export interface StoreSettings {
   paperSize: '58mm' | '80mm';
   qrisImage?: string; // Data URL or URL of uploaded QRIS
   enableMultiTierPricing?: boolean; // Modul berbayar: Multi-tier harga agen & member
+  // Konfigurasi Payment Gateway Midtrans
+  midtransClientKey?: string;
+  midtransServerKey?: string;
+  midtransIsProduction?: boolean;
+  multiTierModulePrice?: number; // Biaya lisensi dalam Rupiah (default: 99000)
 }
 
 export interface AuthUser {

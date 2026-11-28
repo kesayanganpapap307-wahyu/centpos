@@ -15,7 +15,13 @@ import {
   Trash2,
   Lock,
   Crown,
-  Sparkles
+  Sparkles,
+  CreditCard,
+  Key,
+  Eye,
+  EyeOff,
+  ExternalLink,
+  Info
 } from 'lucide-react';
 import { StoreSettings } from '../types/pos';
 
@@ -32,6 +38,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
 }) => {
   const [formData, setFormData] = useState<StoreSettings>({ ...settings });
   const [isSaved, setIsSaved] = useState(false);
+  const [showServerKey, setShowServerKey] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleQrisUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -341,6 +348,152 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                     </>
                   )}
                 </button>
+              </div>
+            </div>
+
+            {/* Konfigurasi Payment Gateway Midtrans */}
+            <div className="mt-4 pt-4 border-t border-slate-200 space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <CreditCard className="w-4 h-4 text-indigo-600" />
+                  <span className="font-bold text-slate-800 text-xs">
+                    Konfigurasi Payment Gateway Otomatis (Midtrans Snap)
+                  </span>
+                </div>
+                <span
+                  className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                    formData.midtransClientKey && formData.midtransServerKey
+                      ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                      : 'bg-amber-50 text-amber-700 border-amber-200'
+                  }`}
+                >
+                  {formData.midtransClientKey && formData.midtransServerKey
+                    ? '✓ Terkonfigurasi'
+                    : '⚠ Belum Lengkap'}
+                </span>
+              </div>
+
+              <p className="text-slate-500 text-[11px] leading-relaxed">
+                Digunakan untuk memproses pembayaran lisensi modul add-on secara instan via QRIS (GoPay, Dana, ShopeePay, OVO), Virtual Account Bank (BCA, BRI, Mandiri, BNI), dan E-Wallet.
+              </p>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                {/* Mode Environment: Sandbox / Production */}
+                <div className="sm:col-span-2 flex flex-col sm:flex-row sm:items-center justify-between p-3 bg-slate-50 border border-slate-200 rounded-xl gap-2">
+                  <div>
+                    <span className="font-semibold text-slate-800 block text-xs">
+                      Mode Transaksi Midtrans
+                    </span>
+                    <span className="text-slate-500 text-[11px]">
+                      Pilih <b>Sandbox</b> untuk uji coba tanpa uang asli, atau <b>Production</b> untuk menerima pembayaran riil.
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-1 bg-white p-1 border border-slate-200 rounded-lg shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => setFormData({ ...formData, midtransIsProduction: false })}
+                      className={`px-3 py-1 text-[11px] font-bold rounded-md transition-all ${
+                        !formData.midtransIsProduction
+                          ? 'bg-amber-500 text-white shadow-xs'
+                          : 'text-slate-600 hover:text-slate-900'
+                      }`}
+                    >
+                      Sandbox (Test)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setFormData({ ...formData, midtransIsProduction: true })}
+                      className={`px-3 py-1 text-[11px] font-bold rounded-md transition-all ${
+                        formData.midtransIsProduction
+                          ? 'bg-emerald-600 text-white shadow-xs'
+                          : 'text-slate-600 hover:text-slate-900'
+                      }`}
+                    >
+                      Production (Live)
+                    </button>
+                  </div>
+                </div>
+
+                {/* Client Key */}
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">
+                    Midtrans Client Key *
+                  </label>
+                  <div className="relative">
+                    <input
+                      type="text"
+                      placeholder={formData.midtransIsProduction ? 'Mid-client-xxxxxxxx' : 'SB-Mid-client-xxxxxxxx'}
+                      value={formData.midtransClientKey || ''}
+                      onChange={(e) => setFormData({ ...formData, midtransClientKey: e.target.value.trim() })}
+                      className="w-full pl-8 pr-3 py-2 border border-slate-300 rounded-xl text-xs font-mono focus:ring-2 focus:ring-indigo-500 focus:outline-hidden"
+                    />
+                    <Key className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-2.5" />
+                  </div>
+                </div>
+
+                {/* Server Key */}
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">
+                    Midtrans Server Key *
+                  </label>
+                  <div className="relative">
+                    <input
+                      type={showServerKey ? 'text' : 'password'}
+                      placeholder={formData.midtransIsProduction ? 'Mid-server-xxxxxxxx' : 'SB-Mid-server-xxxxxxxx'}
+                      value={formData.midtransServerKey || ''}
+                      onChange={(e) => setFormData({ ...formData, midtransServerKey: e.target.value.trim() })}
+                      className="w-full pl-8 pr-9 py-2 border border-slate-300 rounded-xl text-xs font-mono focus:ring-2 focus:ring-indigo-500 focus:outline-hidden"
+                    />
+                    <Key className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-2.5" />
+                    <button
+                      type="button"
+                      onClick={() => setShowServerKey(!showServerKey)}
+                      className="absolute right-2.5 top-2.5 text-slate-400 hover:text-slate-600"
+                    >
+                      {showServerKey ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                    </button>
+                  </div>
+                </div>
+
+                {/* Harga Lisensi Modul */}
+                <div className="sm:col-span-2">
+                  <label className="block font-semibold text-slate-700 mb-1">
+                    Harga Modul Lisensi Multi-Tier (Rupiah)
+                  </label>
+                  <div className="relative max-w-xs">
+                    <span className="absolute left-3 top-2 font-bold text-slate-400 text-xs">Rp</span>
+                    <input
+                      type="number"
+                      min={10000}
+                      step={5000}
+                      value={formData.multiTierModulePrice || 99000}
+                      onChange={(e) => setFormData({ ...formData, multiTierModulePrice: Number(e.target.value) })}
+                      className="w-full pl-10 pr-3 py-2 border border-slate-300 rounded-xl text-xs font-bold text-slate-800 focus:ring-2 focus:ring-indigo-500 focus:outline-hidden"
+                    />
+                  </div>
+                  <span className="text-[10px] text-slate-400 mt-0.5 block">
+                    Nominal ini yang akan ditagihkan ke pembeli modul saat checkout Midtrans.
+                  </span>
+                </div>
+              </div>
+
+              {/* Info Bantuan Midtrans */}
+              <div className="p-3 bg-indigo-50/60 border border-indigo-100 rounded-xl flex items-start gap-2.5 text-[11px] text-indigo-900">
+                <Info className="w-4 h-4 text-indigo-600 shrink-0 mt-0.5" />
+                <div className="space-y-1">
+                  <p>
+                    Dapatkan Client Key & Server Key melalui portal resmi Midtrans di menu: <b>Settings &gt; Access Keys</b>.
+                  </p>
+                  <a
+                    href="https://dashboard.midtrans.com"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1 font-bold text-indigo-700 hover:text-indigo-800 underline"
+                  >
+                    <span>Buka Dashboard Midtrans</span>
+                    <ExternalLink className="w-3 h-3" />
+                  </a>
+                </div>
               </div>
             </div>
           </div>

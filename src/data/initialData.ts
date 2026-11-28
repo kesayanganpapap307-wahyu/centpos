@@ -11,6 +11,10 @@ export const initialStoreSettings: StoreSettings = {
   currency: 'Rp',
   paperSize: '58mm',
   enableMultiTierPricing: false, // Default: Terkunci (Perlu pembelian modul)
+  midtransClientKey: '',
+  midtransServerKey: '',
+  midtransIsProduction: false,
+  multiTierModulePrice: 99000,
 };
 
 export const initialProducts: Product[] = [

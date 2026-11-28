@@ -589,7 +589,7 @@ export const ProductsView: React.FC<ProductsViewProps> = ({
                         onClick={() => setIsUpgradeModalOpen(true)}
                         className="px-3.5 py-1.5 bg-amber-500 hover:bg-amber-600 active:scale-95 text-white font-bold text-xs rounded-xl transition-all shadow-xs"
                       >
-                        Beli / Buka Kunci Modul (Rp 99.000)
+                        Beli / Buka Kunci Modul ({formatCurrency(settings?.multiTierModulePrice || 99000)})
                       </button>
                     </div>
                   ) : (
@@ -672,6 +672,7 @@ export const ProductsView: React.FC<ProductsViewProps> = ({
             onSaveSettings({ ...settings, enableMultiTierPricing: true });
           }
         }}
+        settings={settings}
         storeName={settings?.storeName}
       />
     </div>
