@@ -77,13 +77,16 @@ export async function POST(req: Request) {
     const data = await midtransRes.json();
 
     if (!midtransRes.ok) {
-      console.error('Midtrans API error:', data);
+      console.error('Midtrans API error:', midtransRes.status, data);
+      const detailMsg =
+        (Array.isArray(data?.error_messages) && data.error_messages.join(', ')) ||
+        data?.status_message ||
+        data?.message ||
+        data?.error ||
+        `HTTP ${midtransRes.status}`;
       return NextResponse.json(
         {
-          error:
-            data.error_messages?.join(', ') ||
-            data.message ||
-            'Gagal membuat token pembayaran Midtrans. Pastikan Server Key dan Mode (Sandbox/Production) sudah sesuai.',
+          error: `Gagal membuat token pembayaran Midtrans (${detailMsg}). Pastikan Server Key dan Mode (Sandbox/Production) sudah sesuai.`,
         },
         { status: midtransRes.status }
       );
