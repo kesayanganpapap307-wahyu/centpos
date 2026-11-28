@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef } from 'react';
 import { 
   Settings, 
   Store, 
@@ -12,11 +12,7 @@ import {
   Receipt,
   QrCode,
   Upload,
-  Trash2,
-  Lock,
-  Crown,
-  Sparkles,
-  CreditCard
+  Trash2
 } from 'lucide-react';
 import { StoreSettings } from '../types/pos';
 
@@ -33,49 +29,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
 }) => {
   const [formData, setFormData] = useState<StoreSettings>({ ...settings });
   const [isSaved, setIsSaved] = useState(false);
-  const [cmsStatus, setCmsStatus] = useState<{
-    loading: boolean;
-    connected: boolean;
-    midtransClientKey?: string;
-    hasServerKey?: boolean;
-    hasSupabaseCmsConfig?: boolean;
-    serverKeyDebug?: string;
-    paymentMethods?: { channel_code: string; name: string; provider: string }[];
-    features?: { feature_code: string; name: string; price: number }[];
-  }>({ loading: true, connected: false });
   const fileInputRef = useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    let active = true;
-    const env = formData.midtransIsProduction ? 'production' : 'sandbox';
-    setCmsStatus((prev) => ({ ...prev, loading: true }));
-
-    fetch(`/api/payment/cms-config?env=${env}`)
-      .then((r) => r.json())
-      .then((data) => {
-        if (active) {
-          setCmsStatus({
-            loading: false,
-            connected: Boolean(data?.connected),
-            midtransClientKey: data?.midtransClientKey,
-            hasServerKey: Boolean(data?.hasServerKey),
-            hasSupabaseCmsConfig: Boolean(data?.hasSupabaseCmsConfig),
-            serverKeyDebug: data?.serverKeyDebug,
-            paymentMethods: data?.paymentMethods || [],
-            features: data?.features || [],
-          });
-        }
-      })
-      .catch(() => {
-        if (active) {
-          setCmsStatus({ loading: false, connected: false });
-        }
-      });
-
-    return () => {
-      active = false;
-    };
-  }, [formData.midtransIsProduction]);
 
   const handleQrisUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -323,193 +277,6 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                 <p className="text-[11px] text-slate-500">
                   Format yang didukung: <b>PNG, JPG, WebP</b> (Maksimal 3 MB). Pastikan barcode QRIS terlihat tajam dan jelas agar kamera pelanggan mudah membaca kode.
                 </p>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Manajemen Modul & Lisensi Add-on */}
-        <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-xs space-y-4">
-          <div className="flex items-center gap-2 border-b border-slate-100 pb-3">
-            <Crown className="w-5 h-5 text-indigo-600" />
-            <h3 className="font-bold text-sm text-slate-900">Manajemen Modul &amp; Lisensi Add-On</h3>
-          </div>
-
-          <div className="space-y-3 text-xs">
-            <div className="p-4 bg-gradient-to-r from-slate-50 to-indigo-50/40 border border-slate-200 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-              <div className="space-y-1">
-                <div className="flex items-center gap-2">
-                  <span className="font-bold text-slate-900 text-sm">Modul Multi-Tier Pricing</span>
-                  {formData.enableMultiTierPricing ? (
-                    <span className="inline-flex items-center gap-1 bg-emerald-100 text-emerald-800 text-[10px] font-bold px-2 py-0.5 rounded-full border border-emerald-300">
-                      <Check className="w-3 h-3 stroke-[3]" />
-                      <span>AKTIF (Lisensi Terpasang)</span>
-                    </span>
-                  ) : (
-                    <span className="inline-flex items-center gap-1 bg-amber-100 text-amber-900 text-[10px] font-bold px-2 py-0.5 rounded-full border border-amber-300">
-                      <Lock className="w-3 h-3" />
-                      <span>TERKUNCI (Belum Dibeli)</span>
-                    </span>
-                  )}
-                </div>
-                <p className="text-slate-500 text-[11px] max-w-lg">
-                  Memungkinkan penetapan tingkatan harga jual berbeda untuk <b>Harga Agen/Reseller</b> dan <b>Harga Member</b> di kasir dan data produk.
-                </p>
-              </div>
-
-              <div className="shrink-0 flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() =>
-                    setFormData((prev) => ({
-                      ...prev,
-                      enableMultiTierPricing: !prev.enableMultiTierPricing,
-                    }))
-                  }
-                  className={`px-4 py-2 rounded-xl text-xs font-bold transition-all shadow-xs flex items-center gap-1.5 ${
-                    formData.enableMultiTierPricing
-                      ? 'bg-rose-50 text-rose-700 hover:bg-rose-100 border border-rose-200'
-                      : 'bg-indigo-600 text-white hover:bg-indigo-700 active:scale-95'
-                  }`}
-                >
-                  {formData.enableMultiTierPricing ? (
-                    <>
-                      <Lock className="w-3.5 h-3.5" />
-                      <span>Kunci Kembali (Uji Coba Kunci)</span>
-                    </>
-                  ) : (
-                    <>
-                      <Sparkles className="w-3.5 h-3.5 text-amber-300" />
-                      <span>Aktifkan Lisensi Modul</span>
-                    </>
-                  )}
-                </button>
-              </div>
-            </div>
-
-            {/* Konfigurasi Payment Gateway Midtrans */}
-            <div className="mt-4 pt-4 border-t border-slate-200 space-y-4">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <CreditCard className="w-4 h-4 text-indigo-600" />
-                  <span className="font-bold text-slate-800 text-xs">
-                    Konfigurasi Payment Gateway Otomatis (Midtrans Snap)
-                  </span>
-                </div>
-                <span
-                  className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full border ${
-                    (cmsStatus.connected && cmsStatus.hasServerKey) ||
-                    (formData.midtransClientKey && formData.midtransServerKey)
-                      ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                      : 'bg-amber-50 text-amber-700 border-amber-200'
-                  }`}
-                >
-                  {(cmsStatus.connected && cmsStatus.hasServerKey) ||
-                  (formData.midtransClientKey && formData.midtransServerKey)
-                    ? '✓ Terkonfigurasi'
-                    : '⚠ Belum Lengkap'}
-                </span>
-              </div>
-
-              {/* Status Sinkronisasi CentPay CMS */}
-              <div className="p-3.5 bg-indigo-50/70 border border-indigo-200 rounded-xl space-y-2 text-[11px]">
-                <div className="flex items-center justify-between">
-                  <span className="font-bold text-indigo-950">
-                    Sinkronisasi CentPay CMS (cent-cms.vercel.app)
-                  </span>
-                  {cmsStatus.loading ? (
-                    <span className="text-indigo-600 font-medium">Memeriksa...</span>
-                  ) : cmsStatus.connected ? (
-                    <span className="text-emerald-700 font-bold">✓ Terhubung</span>
-                  ) : (
-                    <span className="text-rose-600 font-bold">✕ Tidak Terhubung</span>
-                  )}
-                </div>
-
-                {!cmsStatus.loading && cmsStatus.connected && (
-                  <div className="space-y-1 text-indigo-900">
-                    <div className="flex flex-wrap gap-x-4 gap-y-1">
-                      <span>
-                        Client Key CMS:{' '}
-                        <b className="font-mono">
-                          {cmsStatus.midtransClientKey || '(Belum diatur)'}
-                        </b>
-                      </span>
-                      <span>
-                        Server Key (`app_gateaway_providers`):{' '}
-                        {cmsStatus.hasServerKey ? (
-                          <b className="text-emerald-700">✓ Tersedia di Server</b>
-                        ) : (
-                          <b className="text-amber-700">
-                            ⚠ Belum ditemukan ({cmsStatus.serverKeyDebug || 'set CENT_CMS_SUPABASE_URL & CENT_CMS_SUPABASE_SERVICE_KEY'})
-                          </b>
-                        )}
-                      </span>
-                    </div>
-                    {cmsStatus.paymentMethods && cmsStatus.paymentMethods.length > 0 && (
-                      <div className="flex flex-wrap items-center gap-1 pt-1">
-                        <span className="text-indigo-700">Metode Aktif:</span>
-                        {cmsStatus.paymentMethods.map((m) => (
-                          <span
-                            key={m.channel_code}
-                            className="px-2 py-0.5 bg-white border border-indigo-200 rounded-md text-[10px] font-semibold text-indigo-800"
-                          >
-                            {m.name} ({m.provider})
-                          </span>
-                        ))}
-                      </div>
-                    )}
-                    {cmsStatus.features && cmsStatus.features.length > 0 && (
-                      <div className="flex flex-wrap items-center gap-1 pt-1">
-                        <span className="text-indigo-700">Harga Fitur CMS:</span>
-                        {cmsStatus.features.map((f) => (
-                          <span
-                            key={f.feature_code}
-                            className="px-2 py-0.5 bg-emerald-50 border border-emerald-200 rounded-md text-[10px] font-semibold text-emerald-800"
-                          >
-                            {f.name}: Rp {Number(f.price).toLocaleString('id-ID')}
-                          </span>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-
-              {/* Mode Environment: Sandbox / Production */}
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between p-3 bg-slate-50 border border-slate-200 rounded-xl gap-2 text-xs">
-                <div>
-                  <span className="font-semibold text-slate-800 block text-xs">
-                    Mode Transaksi Midtrans
-                  </span>
-                  <span className="text-slate-500 text-[11px]">
-                    Pilih <b>Sandbox</b> untuk uji coba tanpa uang asli, atau <b>Production</b> untuk menerima pembayaran riil.
-                  </span>
-                </div>
-                <div className="flex items-center gap-1 bg-white p-1 border border-slate-200 rounded-lg shrink-0">
-                  <button
-                    type="button"
-                    onClick={() => setFormData({ ...formData, midtransIsProduction: false })}
-                    className={`px-3 py-1 text-[11px] font-bold rounded-md transition-all ${
-                      !formData.midtransIsProduction
-                        ? 'bg-amber-500 text-white shadow-xs'
-                        : 'text-slate-600 hover:text-slate-900'
-                    }`}
-                  >
-                    Sandbox (Test)
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setFormData({ ...formData, midtransIsProduction: true })}
-                    className={`px-3 py-1 text-[11px] font-bold rounded-md transition-all ${
-                      formData.midtransIsProduction
-                        ? 'bg-emerald-600 text-white shadow-xs'
-                        : 'text-slate-600 hover:text-slate-900'
-                    }`}
-                  >
-                    Production (Live)
-                  </button>
-                </div>
               </div>
             </div>
           </div>
