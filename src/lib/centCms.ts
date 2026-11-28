@@ -32,15 +32,26 @@ const DEFAULT_APP_SLUG = 'centpos';
 const DEFAULT_APP_KEY = 'ck_live_centpos_9921a8b';
 
 export function getCentCmsSettings() {
+  const rawSupabaseUrl = (process.env.CENT_CMS_SUPABASE_URL || '').trim();
+  let cleanSupabaseUrl = rawSupabaseUrl;
+  if (rawSupabaseUrl) {
+    try {
+      cleanSupabaseUrl = new URL(rawSupabaseUrl).origin;
+    } catch {
+      cleanSupabaseUrl = rawSupabaseUrl.replace(/\/rest\/v1\/?.*$/, '').replace(/\/$/, '');
+    }
+  }
+
   return {
     apiUrl: (process.env.CENT_CMS_API_URL || DEFAULT_CMS_API_URL).replace(/\/$/, ''),
     appSlug: process.env.CENT_CMS_APP_SLUG || DEFAULT_APP_SLUG,
     appKey: process.env.CENT_CMS_APP_KEY || DEFAULT_APP_KEY,
-    supabaseUrl: process.env.CENT_CMS_SUPABASE_URL || '',
-    supabaseKey:
+    supabaseUrl: cleanSupabaseUrl,
+    supabaseKey: (
       process.env.CENT_CMS_SUPABASE_SERVICE_KEY ||
       process.env.CENT_CMS_SUPABASE_ANON_KEY ||
-      '',
+      ''
+    ).trim(),
   };
 }
 
