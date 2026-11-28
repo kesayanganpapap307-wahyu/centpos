@@ -63,6 +63,7 @@ export interface StoreSettings {
   paperSize: '58mm' | '80mm';
   qrisImage?: string; // Data URL or URL of uploaded QRIS
   enableMultiTierPricing?: boolean; // Modul berbayar: Multi-tier harga agen & member
+  unlockedFeatures?: string[]; // Daftar feature_code yang sudah dibeli/aktif (misal: ['multi_tier_pricing'])
   // Konfigurasi Payment Gateway Midtrans
   midtransClientKey?: string;
   midtransServerKey?: string;

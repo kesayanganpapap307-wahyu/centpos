@@ -16,6 +16,14 @@ export interface CentCmsProvider {
   client_key: string;
 }
 
+export interface CentCmsFeature {
+  feature_code: string;
+  name: string;
+  description: string;
+  price: number;
+  billing_type: 'one_time' | 'monthly';
+}
+
 export interface CentCmsPublicConfig {
   app?: {
     slug: string;
@@ -25,6 +33,7 @@ export interface CentCmsPublicConfig {
   environment: 'sandbox' | 'production';
   payment_methods: CentCmsPaymentMethod[];
   providers: CentCmsProvider[];
+  features?: CentCmsFeature[];
 }
 
 const DEFAULT_CMS_API_URL = 'https://cent-cms.vercel.app';
@@ -234,4 +243,52 @@ export async function getCentCmsServerKey(
 ): Promise<string | null> {
   const { serverKey } = await getCentCmsServerKeyWithDebug(providerName, isProduction);
   return serverKey;
+}
+
+/**
+ * Mengambil harga & detail resmi sebuah fitur dari CentPay CMS di sisi server
+ * agar nominal pembayaran tidak bisa dimanipulasi dari sisi browser.
+ */
+export async function getCentCmsFeatureInfo(
+  featureCode: string,
+  env: 'sandbox' | 'production'
+): Promise<CentCmsFeature | null> {
+  const config = await getCentCmsPublicConfig(env);
+  const target = featureCode.trim().toLowerCase();
+  const matched = config?.features?.find(
+    (f) => f.feature_code.toLowerCase() === target
+  );
+  if (matched) {
+    return matched;
+  }
+
+  // Fallback langsung ke Supabase CentPay CMS jika tersedia
+  const { appSlug, supabaseUrl, supabaseKey } = getCentCmsSettings();
+  if (!supabaseUrl || !supabaseKey) return null;
+
+  try {
+    const cmsSupabase = createClient(supabaseUrl, supabaseKey, {
+      auth: { persistSession: false },
+    });
+    const { data: appRow } = await cmsSupabase
+      .from('apps')
+      .select('id')
+      .eq('slug', appSlug)
+      .maybeSingle();
+
+    if (!appRow?.id) return null;
+
+    const { data: featRow } = await cmsSupabase
+      .from('app_features')
+      .select('feature_code, name, description, price, billing_type')
+      .eq('app_id', appRow.id)
+      .eq('feature_code', target)
+      .eq('is_active', true)
+      .maybeSingle();
+
+    if (!featRow) return null;
+    return featRow as CentCmsFeature;
+  } catch {
+    return null;
+  }
 }

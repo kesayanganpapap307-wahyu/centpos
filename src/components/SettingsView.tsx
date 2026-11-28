@@ -47,6 +47,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
     hasSupabaseCmsConfig?: boolean;
     serverKeyDebug?: string;
     paymentMethods?: { channel_code: string; name: string; provider: string }[];
+    features?: { feature_code: string; name: string; price: number }[];
   }>({ loading: true, connected: false });
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -67,6 +68,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
             hasSupabaseCmsConfig: Boolean(data?.hasSupabaseCmsConfig),
             serverKeyDebug: data?.serverKeyDebug,
             paymentMethods: data?.paymentMethods || [],
+            features: data?.features || [],
           });
         }
       })
@@ -459,6 +461,19 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                             className="px-2 py-0.5 bg-white border border-indigo-200 rounded-md text-[10px] font-semibold text-indigo-800"
                           >
                             {m.name} ({m.provider})
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                    {cmsStatus.features && cmsStatus.features.length > 0 && (
+                      <div className="flex flex-wrap items-center gap-1 pt-1">
+                        <span className="text-indigo-700">Harga Fitur CMS:</span>
+                        {cmsStatus.features.map((f) => (
+                          <span
+                            key={f.feature_code}
+                            className="px-2 py-0.5 bg-emerald-50 border border-emerald-200 rounded-md text-[10px] font-semibold text-emerald-800"
+                          >
+                            {f.name}: Rp {Number(f.price).toLocaleString('id-ID')}
                           </span>
                         ))}
                       </div>

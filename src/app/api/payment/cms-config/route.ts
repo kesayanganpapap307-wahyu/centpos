@@ -38,6 +38,7 @@ export async function GET(req: Request) {
       integrationMode: midtransProvider?.integration_mode || 'snap',
       paymentMethods: publicConfig?.payment_methods || [],
       providers: publicConfig?.providers || [],
+      features: publicConfig?.features || [],
       hasSupabaseCmsConfig,
       hasServerKey,
       serverKeyDebug: hasServerKey ? undefined : serverKeyResult.debugReason,

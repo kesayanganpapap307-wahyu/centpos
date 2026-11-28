@@ -567,7 +567,7 @@ export const ProductsView: React.FC<ProductsViewProps> = ({
                     <span className="block font-bold text-slate-800 text-xs">
                       Tingkatan Harga Khusus (Opsional):
                     </span>
-                    {!settings?.enableMultiTierPricing && (
+                    {!(settings?.enableMultiTierPricing || settings?.unlockedFeatures?.includes('multi_tier_pricing')) && (
                       <button
                         type="button"
                         onClick={() => setIsUpgradeModalOpen(true)}
@@ -579,7 +579,7 @@ export const ProductsView: React.FC<ProductsViewProps> = ({
                     )}
                   </div>
 
-                  {!settings?.enableMultiTierPricing ? (
+                  {!(settings?.enableMultiTierPricing || settings?.unlockedFeatures?.includes('multi_tier_pricing')) ? (
                     <div className="p-3 bg-amber-50/80 border border-amber-200 rounded-xl text-center space-y-2">
                       <p className="text-[11px] text-amber-900 font-medium">
                         🔒 Penetapan harga khusus <b>Agen &amp; Member</b> memerlukan <b>Modul Multi-Tier Pricing</b>.
@@ -589,7 +589,7 @@ export const ProductsView: React.FC<ProductsViewProps> = ({
                         onClick={() => setIsUpgradeModalOpen(true)}
                         className="px-3.5 py-1.5 bg-amber-500 hover:bg-amber-600 active:scale-95 text-white font-bold text-xs rounded-xl transition-all shadow-xs"
                       >
-                        Beli / Buka Kunci Modul ({formatCurrency(settings?.multiTierModulePrice || 99000)})
+                        Beli / Buka Kunci Modul
                       </button>
                     </div>
                   ) : (
@@ -669,11 +669,19 @@ export const ProductsView: React.FC<ProductsViewProps> = ({
         onClose={() => setIsUpgradeModalOpen(false)}
         onUnlock={() => {
           if (settings && onSaveSettings) {
-            onSaveSettings({ ...settings, enableMultiTierPricing: true });
+            const unlocked = Array.from(
+              new Set([...(settings.unlockedFeatures || []), 'multi_tier_pricing'])
+            );
+            onSaveSettings({
+              ...settings,
+              enableMultiTierPricing: true,
+              unlockedFeatures: unlocked,
+            });
           }
         }}
         settings={settings}
         storeName={settings?.storeName}
+        featureCode="multi_tier_pricing"
       />
     </div>
   );

@@ -1,11 +1,12 @@
 import { NextResponse } from 'next/server';
-import { getCentCmsServerKey } from '@/lib/centCms';
+import { getCentCmsFeatureInfo, getCentCmsServerKey } from '@/lib/centCms';
 
 export async function POST(req: Request) {
   try {
     const body = await req.json();
     const {
       orderId,
+      featureCode,
       grossAmount,
       serverKey: customServerKey,
       isProduction: customIsProduction,
@@ -18,12 +19,18 @@ export async function POST(req: Request) {
       typeof customIsProduction === 'boolean'
         ? customIsProduction
         : process.env.MIDTRANS_IS_PRODUCTION === 'true';
+    const env = isProduction ? 'production' : 'sandbox';
+    const targetFeatureCode =
+      typeof featureCode === 'string' && featureCode.trim() !== ''
+        ? featureCode.trim()
+        : 'multi_tier_pricing';
 
-    // Prioritas Server Key:
-    // 1. Database Supabase CentPay CMS (tabel app_gateaway_providers)
-    // 2. Environment variable MIDTRANS_SERVER_KEY
-    // 3. Input manual dari pengaturan toko (fallback)
-    const cmsServerKey = await getCentCmsServerKey('midtrans', isProduction);
+    // Ambil Server Key & harga resmi fitur secara paralel di server
+    const [cmsServerKey, cmsFeature] = await Promise.all([
+      getCentCmsServerKey('midtrans', isProduction),
+      getCentCmsFeatureInfo(targetFeatureCode, env),
+    ]);
+
     const serverKey =
       cmsServerKey ||
       process.env.MIDTRANS_SERVER_KEY ||
@@ -45,8 +52,17 @@ export async function POST(req: Request) {
       : 'https://app.sandbox.midtrans.com/snap/v1/transactions';
 
     const finalOrderId =
-      orderId || `CENTPOS-TIER-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
-    const finalAmount = Number(grossAmount) > 0 ? Number(grossAmount) : 99000;
+      orderId || `CENTPOS-${targetFeatureCode.toUpperCase().slice(0, 12)}-${Date.now()}`;
+    // Prioritaskan harga resmi dari CentPay CMS agar tidak bisa dimanipulasi browser
+    const finalAmount =
+      cmsFeature && Number(cmsFeature.price) > 0
+        ? Math.round(Number(cmsFeature.price))
+        : Number(grossAmount) > 0
+          ? Math.round(Number(grossAmount))
+          : 99000;
+    const itemName = (
+      cmsFeature?.name || 'Modul Multi-Tier Pricing (Permanen)'
+    ).slice(0, 50);
 
     const payload = {
       transaction_details: {
@@ -55,10 +71,10 @@ export async function POST(req: Request) {
       },
       item_details: [
         {
-          id: 'ADDON-MULTITIER-PRICING',
+          id: `ADDON-${targetFeatureCode.toUpperCase().slice(0, 30)}`,
           price: finalAmount,
           quantity: 1,
-          name: 'Modul Multi-Tier Pricing (Permanen)',
+          name: itemName,
         },
       ],
       customer_details: {

@@ -18,12 +18,24 @@ import {
 import { StoreSettings } from '../types/pos';
 import { formatCurrency } from '../utils/format';
 
+interface CmsFeatureItem {
+  feature_code: string;
+  name: string;
+  description: string;
+  price: number;
+  billing_type: 'one_time' | 'monthly';
+}
+
 interface UpgradeModalProps {
   isOpen: boolean;
   onClose: () => void;
   onUnlock: () => void;
   settings?: StoreSettings;
   storeName?: string;
+  featureCode?: string;
+  featureTitle?: string;
+  featureDescription?: string;
+  featureBenefits?: string[];
 }
 
 export const UpgradeModal: React.FC<UpgradeModalProps> = ({
@@ -32,6 +44,10 @@ export const UpgradeModal: React.FC<UpgradeModalProps> = ({
   onUnlock,
   settings,
   storeName,
+  featureCode = 'multi_tier_pricing',
+  featureTitle,
+  featureDescription,
+  featureBenefits,
 }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -41,9 +57,27 @@ export const UpgradeModal: React.FC<UpgradeModalProps> = ({
     midtransClientKey?: string;
     hasServerKey?: boolean;
     paymentMethods?: { channel_code: string; name: string; provider: string }[];
+    features?: CmsFeatureItem[];
   } | null>(null);
 
-  const price = settings?.multiTierModulePrice || 99000;
+  const matchedFeature = cmsConfig?.features?.find(
+    (f) => f.feature_code.toLowerCase() === featureCode.toLowerCase()
+  );
+
+  const price =
+    (matchedFeature && Number(matchedFeature.price) > 0 ? Number(matchedFeature.price) : null) ||
+    settings?.multiTierModulePrice ||
+    99000;
+  const displayTitle = matchedFeature?.name || featureTitle || 'Multi-Tier Pricing';
+  const displayDesc =
+    matchedFeature?.description ||
+    featureDescription ||
+    'Buka kunci fitur harga khusus untuk Agen, Reseller, dan Member Toko Anda.';
+  const billingLabel =
+    matchedFeature?.billing_type === 'monthly'
+      ? '/ Bulan'
+      : '/ Sekali Beli (Permanen)';
+
   const isProduction = Boolean(settings?.midtransIsProduction);
   const clientKey =
     cmsConfig?.midtransClientKey?.trim() ||
@@ -109,7 +143,7 @@ export const UpgradeModal: React.FC<UpgradeModalProps> = ({
 
   if (!isOpen) return null;
 
-  const features = [
+  const features = featureBenefits || [
     'Tentukan Harga Khusus untuk Agen, Reseller, & Grosir',
     'Tingkatan Harga Spesial untuk Member VIP Toko',
     'Switch harga instan 1-klik di layar kasir POS saat checkout',
@@ -127,7 +161,8 @@ export const UpgradeModal: React.FC<UpgradeModalProps> = ({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          orderId: `CENTPOS-TIER-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+          orderId: `CENTPOS-${featureCode.toUpperCase().slice(0, 12)}-${Date.now()}`,
+          featureCode,
           grossAmount: price,
           serverKey: serverKey,
           isProduction: isProduction,
@@ -207,9 +242,9 @@ export const UpgradeModal: React.FC<UpgradeModalProps> = ({
             <span>Modul Add-On Premium</span>
           </div>
 
-          <h3 className="text-lg sm:text-xl font-bold tracking-tight">Multi-Tier Pricing</h3>
+          <h3 className="text-lg sm:text-xl font-bold tracking-tight">{displayTitle}</h3>
           <p className="text-blue-100 text-xs mt-1 max-w-xs mx-auto">
-            Buka kunci fitur harga khusus untuk Agen, Reseller, dan Member Toko Anda.
+            {displayDesc}
           </p>
         </div>
 
@@ -221,7 +256,7 @@ export const UpgradeModal: React.FC<UpgradeModalProps> = ({
               <CheckCircle2 className="w-10 h-10 text-emerald-600 mx-auto" />
               <h4 className="font-bold text-emerald-900 text-sm">Pembayaran Berhasil!</h4>
               <p className="text-emerald-700 text-xs">
-                Modul Multi-Tier Pricing telah aktif secara permanen di toko Anda.
+                Modul <b>{displayTitle}</b> telah aktif di toko Anda.
               </p>
             </div>
           )}
@@ -255,7 +290,7 @@ export const UpgradeModal: React.FC<UpgradeModalProps> = ({
                 <span className="text-base font-extrabold text-slate-900">
                   {formatCurrency(price)}
                 </span>
-                <span className="text-[10px] text-slate-500 font-medium">/ Sekali Beli (Permanen)</span>
+                <span className="text-[10px] text-slate-500 font-medium">{billingLabel}</span>
               </div>
             </div>
             <div className="bg-blue-600 text-white p-2 rounded-xl">
