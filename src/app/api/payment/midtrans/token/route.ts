@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { getCentCmsServerKey } from '@/lib/centCms';
 
 export async function POST(req: Request) {
   try {
@@ -13,22 +14,27 @@ export async function POST(req: Request) {
       customerPhone,
     } = body;
 
-    // Ambil server key dari payload pengaturan toko, atau environment variable
-    const serverKey =
-      customServerKey ||
-      process.env.MIDTRANS_SERVER_KEY ||
-      '';
-
     const isProduction =
       typeof customIsProduction === 'boolean'
         ? customIsProduction
         : process.env.MIDTRANS_IS_PRODUCTION === 'true';
 
+    // Prioritas Server Key:
+    // 1. Database Supabase CentPay CMS (tabel app_gateaway_providers)
+    // 2. Environment variable MIDTRANS_SERVER_KEY
+    // 3. Input manual dari pengaturan toko (fallback)
+    const cmsServerKey = await getCentCmsServerKey('midtrans', isProduction);
+    const serverKey =
+      cmsServerKey ||
+      process.env.MIDTRANS_SERVER_KEY ||
+      customServerKey ||
+      '';
+
     if (!serverKey || serverKey.trim() === '') {
       return NextResponse.json(
         {
           error:
-            'Server Key Midtrans belum diisi. Silakan masukkan Server Key di menu Pengaturan > Lisensi & Payment Gateway.',
+            'Server Key Midtrans belum tersedia. Pastikan CENT_CMS_SUPABASE_URL & CENT_CMS_SUPABASE_SERVICE_KEY sudah diatur, atau isi Server Key di menu Pengaturan.',
         },
         { status: 400 }
       );

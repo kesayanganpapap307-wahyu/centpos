@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { getCentCmsServerKey } from '@/lib/centCms';
 
 export async function POST(req: Request) {
   try {
@@ -9,15 +10,17 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Order ID wajib diisi.' }, { status: 400 });
     }
 
-    const serverKey =
-      customServerKey ||
-      process.env.MIDTRANS_SERVER_KEY ||
-      '';
-
     const isProduction =
       typeof customIsProduction === 'boolean'
         ? customIsProduction
         : process.env.MIDTRANS_IS_PRODUCTION === 'true';
+
+    const cmsServerKey = await getCentCmsServerKey('midtrans', isProduction);
+    const serverKey =
+      cmsServerKey ||
+      process.env.MIDTRANS_SERVER_KEY ||
+      customServerKey ||
+      '';
 
     if (!serverKey) {
       return NextResponse.json({ error: 'Server Key Midtrans belum dikonfigurasi.' }, { status: 400 });

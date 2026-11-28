@@ -36,12 +36,44 @@ export const UpgradeModal: React.FC<UpgradeModalProps> = ({
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isSuccess, setIsSuccess] = useState(false);
+  const [cmsConfig, setCmsConfig] = useState<{
+    connected: boolean;
+    midtransClientKey?: string;
+    hasServerKey?: boolean;
+    paymentMethods?: { channel_code: string; name: string; provider: string }[];
+  } | null>(null);
 
   const price = settings?.multiTierModulePrice || 99000;
   const isProduction = Boolean(settings?.midtransIsProduction);
-  const clientKey = settings?.midtransClientKey?.trim() || '';
+  const clientKey =
+    cmsConfig?.midtransClientKey?.trim() ||
+    settings?.midtransClientKey?.trim() ||
+    '';
   const serverKey = settings?.midtransServerKey?.trim() || '';
-  const isGatewayConfigured = Boolean(clientKey && serverKey);
+  const hasServerKey = Boolean(cmsConfig?.hasServerKey || serverKey);
+  const isGatewayConfigured = Boolean(clientKey && hasServerKey);
+
+  // Ambil konfigurasi terbaru dari CentPay CMS saat modal dibuka
+  useEffect(() => {
+    if (!isOpen) return;
+    let active = true;
+    const env = isProduction ? 'production' : 'sandbox';
+
+    fetch(`/api/payment/cms-config?env=${env}`)
+      .then((r) => r.json())
+      .then((data) => {
+        if (active && data) {
+          setCmsConfig(data);
+        }
+      })
+      .catch((err) => {
+        console.error('Gagal memuat config CentPay CMS:', err);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [isOpen, isProduction]);
 
   // Load Midtrans Snap JS dynamically
   useEffect(() => {
@@ -241,15 +273,27 @@ export const UpgradeModal: React.FC<UpgradeModalProps> = ({
             </div>
           )}
 
+          {/* CentPay CMS Sync Status */}
+          {cmsConfig?.connected && (
+            <div className="p-2.5 bg-indigo-50/70 border border-indigo-200 rounded-xl flex items-center justify-between text-[11px]">
+              <span className="font-semibold text-indigo-900">
+                ✓ Tersinkron dengan CentPay CMS
+              </span>
+              <span className="text-indigo-700 font-medium">
+                {isProduction ? 'Production' : 'Sandbox'}
+              </span>
+            </div>
+          )}
+
           {/* Warning if gateway not configured */}
           {!isGatewayConfigured && (
             <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl space-y-1.5 text-amber-900 text-xs">
               <div className="flex items-center gap-1.5 font-bold text-[11px] text-amber-800">
                 <AlertCircle className="w-3.5 h-3.5 text-amber-600" />
-                <span>API Key Midtrans Belum Dikonfigurasi</span>
+                <span>Konfigurasi Midtrans Belum Lengkap</span>
               </div>
               <p className="text-[11px] text-amber-700 leading-relaxed">
-                Anda dapat memasukkan Client Key &amp; Server Key di menu <b>Pengaturan</b> untuk mengaktifkan pembayaran otomatis.
+                Pastikan <b>CENT_CMS_SUPABASE_URL</b> &amp; <b>CENT_CMS_SUPABASE_SERVICE_KEY</b> sudah diatur di Vercel, atau isi Client Key &amp; Server Key manual di menu <b>Pengaturan</b>.
               </p>
             </div>
           )}

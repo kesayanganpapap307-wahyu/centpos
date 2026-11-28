@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { 
   Settings, 
   Store, 
@@ -39,7 +39,45 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   const [formData, setFormData] = useState<StoreSettings>({ ...settings });
   const [isSaved, setIsSaved] = useState(false);
   const [showServerKey, setShowServerKey] = useState(false);
+  const [cmsStatus, setCmsStatus] = useState<{
+    loading: boolean;
+    connected: boolean;
+    midtransClientKey?: string;
+    hasServerKey?: boolean;
+    hasSupabaseCmsConfig?: boolean;
+    paymentMethods?: { channel_code: string; name: string; provider: string }[];
+  }>({ loading: true, connected: false });
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    let active = true;
+    const env = formData.midtransIsProduction ? 'production' : 'sandbox';
+    setCmsStatus((prev) => ({ ...prev, loading: true }));
+
+    fetch(`/api/payment/cms-config?env=${env}`)
+      .then((r) => r.json())
+      .then((data) => {
+        if (active) {
+          setCmsStatus({
+            loading: false,
+            connected: Boolean(data?.connected),
+            midtransClientKey: data?.midtransClientKey,
+            hasServerKey: Boolean(data?.hasServerKey),
+            hasSupabaseCmsConfig: Boolean(data?.hasSupabaseCmsConfig),
+            paymentMethods: data?.paymentMethods || [],
+          });
+        }
+      })
+      .catch(() => {
+        if (active) {
+          setCmsStatus({ loading: false, connected: false });
+        }
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [formData.midtransIsProduction]);
 
   const handleQrisUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -362,19 +400,73 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                 </div>
                 <span
                   className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full border ${
-                    formData.midtransClientKey && formData.midtransServerKey
+                    (cmsStatus.connected && cmsStatus.hasServerKey) ||
+                    (formData.midtransClientKey && formData.midtransServerKey)
                       ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
                       : 'bg-amber-50 text-amber-700 border-amber-200'
                   }`}
                 >
-                  {formData.midtransClientKey && formData.midtransServerKey
+                  {(cmsStatus.connected && cmsStatus.hasServerKey) ||
+                  (formData.midtransClientKey && formData.midtransServerKey)
                     ? '✓ Terkonfigurasi'
                     : '⚠ Belum Lengkap'}
                 </span>
               </div>
 
+              {/* Status Sinkronisasi CentPay CMS */}
+              <div className="p-3.5 bg-indigo-50/70 border border-indigo-200 rounded-xl space-y-2 text-[11px]">
+                <div className="flex items-center justify-between">
+                  <span className="font-bold text-indigo-950">
+                    Sinkronisasi CentPay CMS (cent-cms.vercel.app)
+                  </span>
+                  {cmsStatus.loading ? (
+                    <span className="text-indigo-600 font-medium">Memeriksa...</span>
+                  ) : cmsStatus.connected ? (
+                    <span className="text-emerald-700 font-bold">✓ Terhubung</span>
+                  ) : (
+                    <span className="text-rose-600 font-bold">✕ Tidak Terhubung</span>
+                  )}
+                </div>
+
+                {!cmsStatus.loading && cmsStatus.connected && (
+                  <div className="space-y-1 text-indigo-900">
+                    <div className="flex flex-wrap gap-x-4 gap-y-1">
+                      <span>
+                        Client Key CMS:{' '}
+                        <b className="font-mono">
+                          {cmsStatus.midtransClientKey || '(Belum diatur)'}
+                        </b>
+                      </span>
+                      <span>
+                        Server Key (`app_gateaway_providers`):{' '}
+                        {cmsStatus.hasServerKey ? (
+                          <b className="text-emerald-700">✓ Tersedia di Server</b>
+                        ) : (
+                          <b className="text-amber-700">
+                            ⚠ Belum ditemukan (set CENT_CMS_SUPABASE_URL &amp; CENT_CMS_SUPABASE_SERVICE_KEY)
+                          </b>
+                        )}
+                      </span>
+                    </div>
+                    {cmsStatus.paymentMethods && cmsStatus.paymentMethods.length > 0 && (
+                      <div className="flex flex-wrap items-center gap-1 pt-1">
+                        <span className="text-indigo-700">Metode Aktif:</span>
+                        {cmsStatus.paymentMethods.map((m) => (
+                          <span
+                            key={m.channel_code}
+                            className="px-2 py-0.5 bg-white border border-indigo-200 rounded-md text-[10px] font-semibold text-indigo-800"
+                          >
+                            {m.name} ({m.provider})
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+
               <p className="text-slate-500 text-[11px] leading-relaxed">
-                Digunakan untuk memproses pembayaran lisensi modul add-on secara instan via QRIS (GoPay, Dana, ShopeePay, OVO), Virtual Account Bank (BCA, BRI, Mandiri, BNI), dan E-Wallet.
+                Konfigurasi utama diambil otomatis dari <b>CentPay CMS</b>. Kolom manual di bawah ini bersifat opsional sebagai cadangan (*fallback*) apabila environment Supabase CMS belum diisi.
               </p>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
