@@ -45,6 +45,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
     midtransClientKey?: string;
     hasServerKey?: boolean;
     hasSupabaseCmsConfig?: boolean;
+    serverKeyDebug?: string;
     paymentMethods?: { channel_code: string; name: string; provider: string }[];
   }>({ loading: true, connected: false });
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -64,6 +65,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
             midtransClientKey: data?.midtransClientKey,
             hasServerKey: Boolean(data?.hasServerKey),
             hasSupabaseCmsConfig: Boolean(data?.hasSupabaseCmsConfig),
+            serverKeyDebug: data?.serverKeyDebug,
             paymentMethods: data?.paymentMethods || [],
           });
         }
@@ -443,7 +445,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                           <b className="text-emerald-700">✓ Tersedia di Server</b>
                         ) : (
                           <b className="text-amber-700">
-                            ⚠ Belum ditemukan (set CENT_CMS_SUPABASE_URL &amp; CENT_CMS_SUPABASE_SERVICE_KEY)
+                            ⚠ Belum ditemukan ({cmsStatus.serverKeyDebug || 'set CENT_CMS_SUPABASE_URL & CENT_CMS_SUPABASE_SERVICE_KEY'})
                           </b>
                         )}
                       </span>

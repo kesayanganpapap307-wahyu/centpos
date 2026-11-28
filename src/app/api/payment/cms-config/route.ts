@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import {
   getCentCmsPublicConfig,
-  getCentCmsServerKey,
+  getCentCmsServerKeyWithDebug,
   getCentCmsSettings,
 } from '@/lib/centCms';
 
@@ -16,9 +16,9 @@ export async function GET(req: Request) {
     const { supabaseUrl, supabaseKey } = getCentCmsSettings();
     const hasSupabaseCmsConfig = Boolean(supabaseUrl && supabaseKey);
 
-    const [publicConfig, cmsServerKey] = await Promise.all([
+    const [publicConfig, serverKeyResult] = await Promise.all([
       getCentCmsPublicConfig(env),
-      getCentCmsServerKey('midtrans', isProduction),
+      getCentCmsServerKeyWithDebug('midtrans', isProduction),
     ]);
 
     const midtransProvider = publicConfig?.providers?.find(
@@ -26,7 +26,7 @@ export async function GET(req: Request) {
     );
 
     const hasServerKey = Boolean(
-      cmsServerKey || process.env.MIDTRANS_SERVER_KEY
+      serverKeyResult.serverKey || process.env.MIDTRANS_SERVER_KEY
     );
 
     return NextResponse.json({
@@ -40,8 +40,12 @@ export async function GET(req: Request) {
       providers: publicConfig?.providers || [],
       hasSupabaseCmsConfig,
       hasServerKey,
+      serverKeyDebug: hasServerKey ? undefined : serverKeyResult.debugReason,
     });
   } catch (error: any) {
+    if (error?.digest === 'NEXT_PRERENDER_INTERRUPTED') {
+      throw error;
+    }
     console.error('CMS config route error:', error);
     return NextResponse.json(
       {
